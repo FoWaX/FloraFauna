@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">second_try</string>
+    <string name="login">Login</string>
+    <string name="title_activity_explore">ExploreActivity</string>
+    <string name="title_activity_gallery">GalleryActivity</string>
+    <string name="title_activity_calendar">CalendarActivity</string>
+    <string name="title_activity_achievements">AchievementsActivity</string>
+    <string name="title_activity_tasks">TasksActivity</string>
+</resources>
