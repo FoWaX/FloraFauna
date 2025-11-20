@@ -24,6 +24,7 @@ import com.vanpra.composematerialdialogs.rememberMaterialDialogState
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import com.example.second_try.InvisibleSecretButton
 
 class CalendarActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,30 +84,45 @@ fun CalendarScreen(onNavigateBack: () -> Unit) {
                 Icon(imageVector = Icons.Default.Add, contentDescription = "Добавить заметку")
             }
         }
+
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp)
-        ) {
-            DatePicker(selectedDate = selectedDate, onDateSelected = {
-                selectedDate = it
-                isCreatingNote = false
-                showNoteDialog = true
-            })
+        )
+        {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(16.dp)
+            ) {
+                DatePicker(selectedDate = selectedDate, onDateSelected = {
+                    selectedDate = it
+                    isCreatingNote = false
+                    showNoteDialog = true
+                })
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Text(
-                text = "Заметка на ${selectedDate.format(dateFormatter)}:",
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
-            )
+                Text(
+                    text = "Заметка на ${selectedDate.format(dateFormatter)}:",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
 
-            Text(
-                text = notes[selectedDate.toString()] ?: "Нет заметки",
-                modifier = Modifier.padding(top = 8.dp)
+                Text(
+                    text = notes[selectedDate.toString()] ?: "Нет заметки",
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+            // 🔥 Вот здесь добавляем секретное место
+            InvisibleSecretButton(
+                secretKey = "secret1Found",
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(24.dp)
             )
         }
     }

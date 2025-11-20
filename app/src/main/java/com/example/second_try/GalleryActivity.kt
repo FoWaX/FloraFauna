@@ -26,6 +26,7 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.second_try.ui.components.AppTopBar
 import com.example.second_try.ui.theme.Second_tryTheme
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 
 data class GalleryImage(
     val uri: Uri,
@@ -51,6 +52,44 @@ fun GalleryScreen(onNavigateBack: () -> Unit) {
     if (user == null) return
 
     val prefs = context.getSharedPreferences("gallery_${user.uid}", Context.MODE_PRIVATE)
+
+    // --- Увеличиваем счётчик открытий галереи ---
+    LaunchedEffect(Unit) {
+        val dbRef = FirebaseDatabase.getInstance(
+            "https://mental-health-72105-default-rtdb.europe-west1.firebasedatabase.app"
+        ).getReference("Users").child(user.uid)
+
+        val visitsRef = dbRef.child("galleryVisits")
+        visitsRef.get().addOnSuccessListener { snapshot ->
+            val currentCount = snapshot.getValue(Int::class.java) ?: 0
+            val newCount = currentCount + 1
+            visitsRef.setValue(newCount)
+
+            // Проверяем достижение "Мастер кадра"
+            if (newCount >= 10) {
+                val doneRef = dbRef.child("achievementsDone").child("master_photo")
+                val rewardedRef = dbRef.child("achievementsRewarded").child("master_photo")
+
+                doneRef.setValue(true)
+
+                rewardedRef.get().addOnSuccessListener { rewardSnap ->
+                    val alreadyRewarded = rewardSnap.getValue(Boolean::class.java) ?: false
+                    if (!alreadyRewarded) {
+                        val conesRef = dbRef.child("cones")
+                        conesRef.get().addOnSuccessListener { conesSnap ->
+                            val currentCones = conesSnap.getValue(Int::class.java) ?: 0
+                            conesRef.setValue(currentCones + 50) // +50 шишек
+                        }
+                        rewardedRef.setValue(true)
+                    }
+                }
+
+                // Удаляем счётчик после получения достижения
+                visitsRef.removeValue()
+            }
+        }
+    }
+
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var images by remember {

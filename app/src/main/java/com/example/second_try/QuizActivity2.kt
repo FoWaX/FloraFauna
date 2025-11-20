@@ -178,7 +178,13 @@ fun QuizScreen2(onBackPressed: () -> Unit) {
             } else {
                 LaunchedEffect(Unit) {
                     dbRef.child("quiz2_done").setValue(true)
+
+                    // Проверяем идеальное прохождение
+                    if (correctCount == questions.size) {
+                        dbRef.child("perfect_quiz2").setValue(true)
+                    }
                 }
+
 
                 Column(
                     modifier = Modifier.align(Alignment.Center),

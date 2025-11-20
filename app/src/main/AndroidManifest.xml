@@ -29,6 +29,11 @@
             android:label="PhotoViewActivity"
             android:theme="@style/Theme.Second_try" />
         <activity
+            android:name=".ProfileActivity"
+            android:exported="false"
+            android:label="ProfileActivity"
+            android:theme="@style/Theme.Second_try" />
+        <activity
             android:name=".QuizActivity1"
             android:exported="false"
             android:label="QuizActivity1"

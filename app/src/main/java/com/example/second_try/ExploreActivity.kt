@@ -1,5 +1,6 @@
 package com.example.second_try
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -27,7 +28,6 @@ import androidx.compose.ui.window.Dialog
 import com.example.second_try.ui.theme.Second_tryTheme
 import com.example.second_try.ui.components.AppTopBar
 import androidx.compose.foundation.background
-
 
 class ExploreActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -148,6 +148,7 @@ fun SectionBlock(
 
 @Composable
 fun ImageGrid(imageIds: List<String>, imageTitles: Map<String, String>) {
+    val context = LocalContext.current
     var selectedImage by remember { mutableStateOf<String?>(null) }
 
     LazyVerticalGrid(
@@ -178,8 +179,19 @@ fun ImageGrid(imageIds: List<String>, imageTitles: Map<String, String>) {
         }
     }
 
-    // Превью выбранного изображения
+    // Когда выбранное изображение изменилось — сохраняем "просмотр" (скрытый флаг) в SharedPreferences
     selectedImage?.let { imageName ->
+        // side-effect: записываем при первом показе диалога
+        LaunchedEffect(imageName) {
+            val prefs = context.getSharedPreferences("viewed_cards", Context.MODE_PRIVATE)
+            val existing = prefs.getStringSet("viewed_set", mutableSetOf())?.toMutableSet() ?: mutableSetOf()
+            if (!existing.contains(imageName)) {
+                existing.add(imageName)
+                prefs.edit().putStringSet("viewed_set", existing).apply()
+            }
+        }
+
+        // Превью выбранного изображения (диалог)
         Dialog(onDismissRequest = { selectedImage = null }) {
             Box(
                 modifier = Modifier

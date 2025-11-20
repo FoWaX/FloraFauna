@@ -41,6 +41,16 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import com.google.firebase.database.FirebaseDatabase
+import com.example.second_try.InvisibleSecretButton
+import android.content.SharedPreferences
+import kotlinx.coroutines.awaitCancellation
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+
 
 lateinit var photoUri: Uri
 lateinit var takePictureLauncher: ActivityResultLauncher<Uri>
@@ -48,6 +58,9 @@ lateinit var takePictureLauncher: ActivityResultLauncher<Uri>
 class MainActivity : AppCompatActivity() {
 
     private lateinit var auth: FirebaseAuth
+    private var profilePhotoUriState = mutableStateOf<Uri?>(null)
+    lateinit var profileResultLauncher: ActivityResultLauncher<Intent>
+
 
     private fun launchCamera() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
@@ -117,6 +130,30 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, LoginActivity::class.java))
             finish()
         } else {
+            profileResultLauncher =
+                registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                    if (result.resultCode == RESULT_OK) {
+                        val prefs = getSharedPreferences("profile_prefs", Context.MODE_PRIVATE)
+                        val path = prefs.getString("profile_photo_path", null)
+                        if (path != null && File(path).exists()) {
+                            profilePhotoUriState.value = Uri.fromFile(File(path))
+                        } else {
+                            profilePhotoUriState.value = null
+                        }
+                        setContent {
+                            Second_tryTheme {
+                                MainScreen(
+                                    onLogout = {
+                                        FirebaseAuth.getInstance().signOut()
+                                        startActivity(Intent(this, LoginActivity::class.java))
+                                        finish()
+                                    },
+                                    onCameraClick = { launchCamera() }
+                                )
+                            }
+                        }
+                    }
+                }
             setContent {
                 Second_tryTheme {
                     MainScreen(
@@ -139,11 +176,65 @@ class MainActivity : AppCompatActivity() {
 @Composable
 fun MainScreen(modifier: Modifier = Modifier, onLogout: () -> Unit, onCameraClick: () -> Unit) {
     val context = LocalContext.current
+    var profilePhotoUri by remember { mutableStateOf<Uri?>(null) }
+
+    // Загрузка фото из SharedPreferences
+    val prefs = context.getSharedPreferences("profile_prefs", Context.MODE_PRIVATE)
+
+    // Загружаем фото при старте и при возврате на экран
+    LaunchedEffect(Unit) {
+        val path = prefs.getString("profile_photo_path", null)
+        if (path != null && File(path).exists()) {
+            profilePhotoUri = Uri.fromFile(File(path))
+        } else {
+            profilePhotoUri = null
+        }
+    }
+
+    // Слушатель (дополнительно, на случай, если изменения происходят в реальном времени)
+    DisposableEffect(Unit) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "profile_photo_path") {
+                val newPath = prefs.getString("profile_photo_path", null)
+                profilePhotoUri = if (newPath != null && File(newPath).exists()) {
+                    Uri.fromFile(File(newPath))
+                } else null
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
 
     Scaffold(
         topBar = {
             AppTopBar(
-                title = "Главное меню"
+                title = "Главное меню",
+                actions = {
+                    val mainActivity = context as? MainActivity
+                    IconButton(
+                        onClick = {
+                            mainActivity?.let {
+                                val intent = Intent(it, ProfileActivity::class.java)
+                                it.profileResultLauncher.launch(intent)
+                            }
+                        }
+                    ) {
+                        val painter = if (profilePhotoUri != null)
+                            coil.compose.rememberAsyncImagePainter(profilePhotoUri)
+                        else
+                            painterResource(id = R.drawable.ic_orig)
+
+                        Image(
+                            painter = painter,
+                            contentDescription = "Профиль",
+                            modifier = Modifier
+                                .size(40.dp)
+                                .padding(4.dp)
+                        )
+                    }
+                }
             )
         }
     ) { innerPadding ->
@@ -152,16 +243,28 @@ fun MainScreen(modifier: Modifier = Modifier, onLogout: () -> Unit, onCameraClic
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            Text(
-                text = "FloraFauna",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF6200EE),
-                textAlign = TextAlign.Center,
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 16.dp)
-            )
+                    .wrapContentHeight()
+                    .padding(top = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "FloraFauna",
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF6200EE)
+                )
+
+                // 🔥 Секретная кнопка поверх текста
+                InvisibleSecretButton(
+                    secretKey = "secret2Found",
+                    modifier = Modifier
+                        .matchParentSize() // перекрывает всю надпись
+                )
+            }
+
 
             Box(modifier = Modifier.fillMaxSize()) {
                 Column(

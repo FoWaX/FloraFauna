@@ -173,7 +173,13 @@ fun QuizScreen1(onBackPressed: () -> Unit) {
                 // Сохраняем прогресс в Firebase
                 LaunchedEffect(Unit) {
                     dbRef.child("quiz1_done").setValue(true)
+
+                    // Проверяем идеальное прохождение
+                    if (correctCount == questions.size) {
+                        dbRef.child("perfect_quiz1").setValue(true)
+                    }
                 }
+
 
                 Column(
                     modifier = Modifier.align(Alignment.Center),
