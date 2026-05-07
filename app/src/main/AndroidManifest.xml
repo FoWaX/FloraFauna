@@ -34,19 +34,24 @@
             android:label="ProfileActivity"
             android:theme="@style/Theme.Second_try" />
         <activity
-            android:name=".QuizActivity1"
+            android:name=".PhotoRiddlesQuizActivity"
             android:exported="false"
-            android:label="QuizActivity1"
+            android:label="PhotoRiddlesQuizActivity"
             android:theme="@style/Theme.Second_try" />
         <activity
-            android:name=".QuizActivity2"
+            android:name=".ImageQuizzesActivity"
             android:exported="false"
-            android:label="QuizActivity2"
+            android:label="ImageQuizzesActivity"
             android:theme="@style/Theme.Second_try" />
         <activity
-            android:name=".QuizActivity3"
+            android:name=".BeastsQuizActivity"
             android:exported="false"
-            android:label="QuizActivity3"
+            android:label="BeastsQuizActivity"
+            android:theme="@style/Theme.Second_try" />
+        <activity
+            android:name=".BirdsQuizActivity"
+            android:exported="false"
+            android:label="BirdsQuizActivity"
             android:theme="@style/Theme.Second_try" />
         <activity
             android:name=".PdfViewerActivity"

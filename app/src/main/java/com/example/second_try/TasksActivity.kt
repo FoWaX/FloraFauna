@@ -17,9 +17,6 @@ import com.example.second_try.ui.components.AppTopBar
 import com.example.second_try.ui.theme.Second_tryTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.Text
 
 class TasksActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,28 +31,107 @@ class TasksActivity : ComponentActivity() {
     }
 }
 
+data class QuizMenuItem(
+    val id: String,
+    val title: String,
+    val description: String,
+    val launchMode: QuizLaunchMode,
+    val targetQuizId: String? = null
+)
+
+enum class QuizLaunchMode {
+    IMAGE_QUIZ,     // открываем ImageQuizzesActivity и передаем quiz_id
+    PHOTO_RIDDLES,   // открываем PhotoRiddlesQuizActivity
+    BEASTS,           // открываем BeastsQuizActivity
+    BIRDS_TEXT        // открываем BirdsQuizActivity
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TasksScreen(onNavigateBack: () -> Unit) {
     val context = LocalContext.current
-    val user = FirebaseAuth.getInstance().currentUser
+    val user = FirebaseAuth.getInstance().currentUser ?: return
+
     val dbRef = FirebaseDatabase.getInstance(
         "https://mental-health-72105-default-rtdb.europe-west1.firebasedatabase.app"
-    ).getReference("Users").child(user!!.uid).child("quiz_progress")
+    ).getReference("Users").child(user.uid).child("quiz_progress")
 
-    // Прогресс каждого квиза
-    var quiz1Done by remember { mutableStateOf(false) }
-    var quiz2Done by remember { mutableStateOf(false) }
-    var quiz3Done by remember { mutableStateOf(false) }
+    val quizItems = remember {
+        listOf(
+            QuizMenuItem(
+                id = "photo_riddles",
+                title = "Фотозагадки",
+                description = "Посмотри на фото и выбери правильный ответ.",
+                launchMode = QuizLaunchMode.PHOTO_RIDDLES
+            ),
+            QuizMenuItem(
+                id = "amphibian_signs",
+                title = "Признаки земноводных",
+                description = "Выбирай правильное изображение по признакам амфибий.",
+                launchMode = QuizLaunchMode.IMAGE_QUIZ,
+                targetQuizId = "amphibian_signs"
+            ),
+            QuizMenuItem(
+                id = "reptile_signs",
+                title = "Признаки пресмыкающихся",
+                description = "Тренируем признаки рептилий по изображениям.",
+                launchMode = QuizLaunchMode.IMAGE_QUIZ,
+                targetQuizId = "reptile_signs"
+            ),
+            QuizMenuItem(
+                id = "who_is_who",
+                title = "Кто есть кто?",
+                description = "Отличаем земноводных и пресмыкающихся.",
+                launchMode = QuizLaunchMode.IMAGE_QUIZ,
+                targetQuizId = "who_is_who"
+            ),
+            QuizMenuItem(
+                id = "amphibian_names",
+                title = "Тренажер названий земноводных",
+                description = "Выбери фото нужного земноводного.",
+                launchMode = QuizLaunchMode.IMAGE_QUIZ,
+                targetQuizId = "amphibian_names"
+            ),
+            QuizMenuItem(
+                id = "reptile_names",
+                title = "Тренажер названий пресмыкающихся",
+                description = "Выбери фото нужного пресмыкающегося.",
+                launchMode = QuizLaunchMode.IMAGE_QUIZ,
+                targetQuizId = "reptile_names"
+            ),
+            QuizMenuItem(
+                id = "dangerous_or_not",
+                title = "Опасные и безобидные",
+                description = "Определи опасных и безопасных животных.",
+                launchMode = QuizLaunchMode.IMAGE_QUIZ,
+                targetQuizId = "dangerous_or_not"
+            ),
+            QuizMenuItem(
+                id = "beasts_quiz",
+                title = "Звери",
+                description = "Фото животного + 3 вопроса с подтверждением.",
+                launchMode = QuizLaunchMode.BEASTS
+            ),
+            QuizMenuItem(
+                id = "birds_text_quiz",
+                title = "Птицы",
+                description = "Большая викторина по птицам с выбором ответа.",
+                launchMode = QuizLaunchMode.BIRDS_TEXT
+            ),
+        )
+    }
 
-    var dialogType by remember { mutableStateOf<Int?>(null) }
+    var doneMap by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
+    var dialogQuiz by remember { mutableStateOf<QuizMenuItem?>(null) }
 
-    // Загружаем прогресс из Firebase
     LaunchedEffect(Unit) {
         dbRef.get().addOnSuccessListener { snapshot ->
-            quiz1Done = snapshot.child("quiz1_done").getValue(Boolean::class.java) ?: false
-            quiz2Done = snapshot.child("quiz2_done").getValue(Boolean::class.java) ?: false
-            quiz3Done = snapshot.child("quiz3_done").getValue(Boolean::class.java) ?: false
+            val loaded = mutableMapOf<String, Boolean>()
+            quizItems.forEach { item ->
+                loaded["${item.id}_done"] =
+                    snapshot.child("${item.id}_done").getValue(Boolean::class.java) ?: false
+            }
+            doneMap = loaded
         }
     }
 
@@ -78,81 +154,72 @@ fun TasksScreen(onNavigateBack: () -> Unit) {
             contentAlignment = Alignment.Center
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier.padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Готов к весёлому заданию? 🌟",
+                    text = "Готов к заданиям? 🌟",
                     fontSize = 20.sp,
                     color = Color.Black
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
-                QuizButton(
-                    text = "Начать викторину: Кто есть кто?",
-                    isDone = quiz1Done,
-                    onClick = { dialogType = 1 }
-                )
+                quizItems.forEachIndexed { index, item ->
+                    QuizButton(
+                        text = item.title,
+                        isDone = doneMap["${item.id}_done"] == true,
+                        onClick = { dialogQuiz = item }
+                    )
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                QuizButton(
-                    text = "Начать викторину: Узнай земноводное!",
-                    isDone = quiz2Done,
-                    onClick = { dialogType = 2 }
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                QuizButton(
-                    text = "Начать викторину: Пресмыкающееся в кадре!",
-                    isDone = quiz3Done,
-                    onClick = { dialogType = 3 }
-                )
+                    if (index != quizItems.lastIndex) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
             }
         }
     }
 
-    dialogType?.let { type ->
-        val (title, message, activityClass) = when (type) {
-            1 -> Triple(
-                "Тест: Кто есть кто?",
-                "В этом задании ты будешь выбирать, кто из животных — земноводное, а кто — пресмыкающееся. Посмотри на картинки внимательно и выбирай правильно! 🦎🐸",
-                QuizActivity1::class.java
-            )
-            2 -> Triple(
-                "Тест: Земноводное по названию",
-                "Тебе нужно будет выбрать земноводное, соответствующее указанному названию. Все картинки — земноводные, но правильный только один! 🐸",
-                QuizActivity2::class.java
-            )
-            3 -> Triple(
-                "Тест: Пресмыкающееся по названию",
-                "Теперь найди пресмыкающееся по названию! Все картинки — пресмыкающиеся, но правильный вариант только один. Удачи! 🐍",
-                QuizActivity3::class.java
-            )
-            else -> Triple("", "", QuizActivity1::class.java)
-        }
-
+    dialogQuiz?.let { item ->
         AlertDialog(
-            onDismissRequest = { dialogType = null },
-            title = { Text(title) },
-            text = { Text(message) },
+            onDismissRequest = { dialogQuiz = null },
+            title = { Text(item.title) },
+            text = { Text(item.description) },
             confirmButton = {
-                TextButton(onClick = {
-                    dialogType = null
-                    context.startActivity(Intent(context, activityClass))
-                }) { Text("Начнём!") }
+                TextButton(
+                    onClick = {
+                        dialogQuiz = null
+                        when (item.launchMode) {
+                            QuizLaunchMode.IMAGE_QUIZ -> {
+                                val intent = Intent(context, ImageQuizzesActivity::class.java)
+                                intent.putExtra("quiz_id", item.targetQuizId ?: item.id)
+                                context.startActivity(intent)
+                            }
+
+                            QuizLaunchMode.PHOTO_RIDDLES -> {
+                                val intent = Intent(context, PhotoRiddlesQuizActivity::class.java)
+                                context.startActivity(intent)
+                            }
+
+                            QuizLaunchMode.BEASTS -> {
+                                context.startActivity(Intent(context, BeastsQuizActivity::class.java))
+                            }
+                            QuizLaunchMode.BIRDS_TEXT -> {
+                                context.startActivity(Intent(context, BirdsQuizActivity::class.java))
+                            }
+                        }
+                    }
+                ) { Text("Начнём!") }
             },
             dismissButton = {
-                TextButton(onClick = { dialogType = null }) { Text("Отмена") }
+                TextButton(onClick = { dialogQuiz = null }) { Text("Отмена") }
             }
         )
     }
 
-    // Если все три квиза пройдены, можно сохранять глобальный прогресс
-    LaunchedEffect(quiz1Done, quiz2Done, quiz3Done) {
-        if (quiz1Done && quiz2Done && quiz3Done) {
+    // Если все 6 пройдены — сохраняем общий флаг
+    LaunchedEffect(doneMap) {
+        if (quizItems.isNotEmpty() && quizItems.all { doneMap["${it.id}_done"] == true }) {
             dbRef.child("all_quizzes_done").setValue(true)
         }
     }
