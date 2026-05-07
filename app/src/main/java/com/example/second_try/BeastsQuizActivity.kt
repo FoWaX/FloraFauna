@@ -6,7 +6,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -14,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material3.CardDefaults.cardColors
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,15 +31,19 @@ import kotlin.random.Random
 class BeastsQuizActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val quizPart = intent.getIntExtra("quiz_part", 1).coerceIn(1, 2)
+
         setContent {
             Second_tryTheme {
-                BeastsQuizScreen(onBackPressed = { finish() })
+                BeastsQuizScreen(
+                    quizPart = quizPart,
+                    onBackPressed = { finish() }
+                )
             }
         }
     }
 }
-
-// -------------------- DATA MODELS --------------------
 
 data class BeastsRawOption(
     val text: String,
@@ -63,7 +67,7 @@ data class BeastsUiOption(
 )
 
 data class BeastsUiQuestion(
-    val id: String, // уникальный id вопроса
+    val id: String,
     val text: String,
     val options: List<BeastsUiOption>
 )
@@ -75,83 +79,118 @@ data class BeastsUiGroup(
     val questions: List<BeastsUiQuestion>
 )
 
-// -------------------- ACTUAL SCREEN --------------------
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BeastsQuizScreen(onBackPressed: () -> Unit) {
+fun BeastsQuizScreen(
+    quizPart: Int,
+    onBackPressed: () -> Unit
+) {
     val context = LocalContext.current
     val user = FirebaseAuth.getInstance().currentUser
-    val dbRef = FirebaseDatabase.getInstance(
-        "https://mental-health-72105-default-rtdb.europe-west1.firebasedatabase.app"
-    ).getReference("Users").child(user!!.uid).child("quiz_progress")
 
-    // Загружаем и готовим викторину 1 раз
-    val groups = remember {
-        parseBeastsQuizFromRaw(context)
-            .mapIndexed { groupIndex, rawGroup ->
-                val resId = context.resources.getIdentifier(
-                    rawGroup.imageResName,
-                    "drawable",
-                    context.packageName
-                )
+    if (user == null) {
+        Text(
+            text = "Чтобы проходить викторины, нужно войти в аккаунт.",
+            modifier = Modifier.padding(16.dp)
+        )
+        return
+    }
 
-                BeastsUiGroup(
-                    animalName = rawGroup.animalName,
-                    imageResName = rawGroup.imageResName,
-                    imageResId = resId,
-                    questions = rawGroup.questions.mapIndexed { qIndex, rawQuestion ->
-                        BeastsUiQuestion(
-                            id = "g${groupIndex}_q$qIndex",
-                            text = rawQuestion.text,
-                            options = rawQuestion.options.shuffled(Random(System.nanoTime())).map {
+    val dbRef = remember(user.uid) {
+        FirebaseDatabase.getInstance(
+            "https://mental-health-72105-default-rtdb.europe-west1.firebasedatabase.app"
+        ).getReference("Users").child(user.uid).child("quiz_progress")
+    }
+
+    val groups = remember(quizPart) {
+        val allRawGroups = parseBeastsQuizFromRaw(context)
+        val middle = (allRawGroups.size + 1) / 2
+
+        val rawGroupsForPart = if (quizPart == 1) {
+            allRawGroups.take(middle)
+        } else {
+            allRawGroups.drop(middle)
+        }
+
+        rawGroupsForPart.mapIndexed { groupIndex, rawGroup ->
+            val resId = context.resources.getIdentifier(
+                rawGroup.imageResName,
+                "drawable",
+                context.packageName
+            )
+
+            BeastsUiGroup(
+                animalName = rawGroup.animalName,
+                imageResName = rawGroup.imageResName,
+                imageResId = resId,
+                questions = rawGroup.questions.mapIndexed { qIndex, rawQuestion ->
+                    BeastsUiQuestion(
+                        id = "part${quizPart}_g${groupIndex}_q$qIndex",
+                        text = rawQuestion.text,
+                        options = rawQuestion.options
+                            .shuffled(Random(System.nanoTime()))
+                            .map { rawOption ->
                                 BeastsUiOption(
-                                    text = it.text,
-                                    isCorrect = it.isCorrect
+                                    text = rawOption.text,
+                                    isCorrect = rawOption.isCorrect
                                 )
                             }
-                        )
-                    }
-                )
-            }
+                    )
+                }
+            )
+        }
+    }
+
+    val doneKey = remember(quizPart) {
+        if (quizPart == 1) "beasts_quiz_1_done" else "beasts_quiz_2_done"
+    }
+
+    val perfectKey = remember(quizPart) {
+        if (quizPart == 1) "perfect_beasts_quiz_1" else "perfect_beasts_quiz_2"
     }
 
     var currentGroupIndex by remember { mutableStateOf(0) }
 
-    // выбранные ответы: key = question.id, value = index выбранного варианта
-    val selectedAnswers = remember { mutableStateMapOf<String, Int>() }
+    val selectedAnswers: SnapshotStateMap<String, Int> = remember {
+        mutableStateMapOf()
+    }
 
-    // какие группы уже подтверждены (чтобы показывать подсветку)
-    val confirmedGroups = remember { mutableStateMapOf<Int, Boolean>() }
+    val confirmedGroups: SnapshotStateMap<Int, Boolean> = remember {
+        mutableStateMapOf()
+    }
 
     var showFinalDialog by remember { mutableStateOf(false) }
     var isFinished by remember { mutableStateOf(false) }
 
     val totalQuestions = groups.sumOf { it.questions.size }
 
-    // Подсчёт результата (неотвеченные считаются неверными)
-    val correctAnswersCount = remember(selectedAnswers, groups) {
-        groups.sumOf { group ->
-            group.questions.count { question ->
-                val selectedIndex = selectedAnswers[question.id]
-                selectedIndex != null && question.options.getOrNull(selectedIndex)?.isCorrect == true
+    val correctAnswersCount by remember {
+        derivedStateOf {
+            groups.sumOf { group ->
+                group.questions.count { question ->
+                    val selectedIndex = selectedAnswers[question.id]
+                    selectedIndex != null &&
+                            question.options.getOrNull(selectedIndex)?.isCorrect == true
+                }
             }
         }
     }
 
     if (isFinished) {
-        // Сохраняем прогресс в Firebase один раз
         LaunchedEffect(Unit) {
-            dbRef.child("beasts_quiz_done").setValue(true)
+            dbRef.child(doneKey).setValue(true)
+
             if (correctAnswersCount == totalQuestions) {
-                dbRef.child("perfect_beasts_quiz").setValue(true)
+                dbRef.child(perfectKey).setValue(true)
             }
         }
 
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Викторина: Звери", color = Color.White) },
+                    title = {
+                        Text("Викторина: Звери $quizPart", color = Color.White)
+                    },
                     navigationIcon = {
                         IconButton(onClick = onBackPressed) {
                             Icon(
@@ -161,7 +200,9 @@ fun BeastsQuizScreen(onBackPressed: () -> Unit) {
                             )
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF6200EE))
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color(0xFF6200EE)
+                    )
                 )
             }
         ) { innerPadding ->
@@ -173,22 +214,33 @@ fun BeastsQuizScreen(onBackPressed: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text("Викторина завершена!", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "Викторина завершена!",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
                 Spacer(Modifier.height(12.dp))
+
                 Text("Правильных ответов: $correctAnswersCount из $totalQuestions")
+
                 Spacer(Modifier.height(24.dp))
 
-                Button(onClick = {
-                    context.startActivity(Intent(context, TasksActivity::class.java))
-                }) {
+                Button(
+                    onClick = {
+                        context.startActivity(Intent(context, TasksActivity::class.java))
+                    }
+                ) {
                     Text("Вернуться к викторинам")
                 }
 
                 Spacer(Modifier.height(12.dp))
 
-                Button(onClick = {
-                    context.startActivity(Intent(context, MainActivity::class.java))
-                }) {
+                Button(
+                    onClick = {
+                        context.startActivity(Intent(context, MainActivity::class.java))
+                    }
+                ) {
                     Text("Главное меню")
                 }
             }
@@ -198,11 +250,12 @@ fun BeastsQuizScreen(onBackPressed: () -> Unit) {
     }
 
     if (groups.isEmpty()) {
-        // Если вдруг raw-файл не распарсился
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Викторина: Звери", color = Color.White) },
+                    title = {
+                        Text("Викторина: Звери $quizPart", color = Color.White)
+                    },
                     navigationIcon = {
                         IconButton(onClick = onBackPressed) {
                             Icon(
@@ -212,7 +265,9 @@ fun BeastsQuizScreen(onBackPressed: () -> Unit) {
                             )
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF6200EE))
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color(0xFF6200EE)
+                    )
                 )
             }
         ) { innerPadding ->
@@ -225,19 +280,23 @@ fun BeastsQuizScreen(onBackPressed: () -> Unit) {
                 Text("Не удалось загрузить вопросы викторины.\nПроверь файл res/raw/beasts_quiz_text.txt")
             }
         }
+
         return
     }
 
     val currentGroup = groups[currentGroupIndex]
     val isCurrentGroupConfirmed = confirmedGroups[currentGroupIndex] == true
 
-    // Проверяем, на все ли 3 вопроса текущей группы пользователь выбрал ответ
-    val allThreeAnswered = currentGroup.questions.all { q -> selectedAnswers.containsKey(q.id) }
+    val allThreeAnswered = currentGroup.questions.all { question ->
+        selectedAnswers.containsKey(question.id)
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Викторина: Звери", color = Color.White) },
+                title = {
+                    Text("Викторина: Звери $quizPart", color = Color.White)
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackPressed) {
                         Icon(
@@ -247,17 +306,17 @@ fun BeastsQuizScreen(onBackPressed: () -> Unit) {
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF6200EE))
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFF6200EE)
+                )
             )
         }
     ) { innerPadding ->
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // ---------------- Стрелки навигации сверху ----------------
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -272,7 +331,7 @@ fun BeastsQuizScreen(onBackPressed: () -> Unit) {
                     enabled = currentGroupIndex > 0
                 ) {
                     Text(
-                        "◀",
+                        text = "◀",
                         fontSize = 22.sp,
                         color = if (currentGroupIndex > 0) Color.Black else Color.Gray
                     )
@@ -290,21 +349,19 @@ fun BeastsQuizScreen(onBackPressed: () -> Unit) {
                     enabled = currentGroupIndex < groups.lastIndex
                 ) {
                     Text(
-                        "▶",
+                        text = "▶",
                         fontSize = 22.sp,
                         color = if (currentGroupIndex < groups.lastIndex) Color.Black else Color.Gray
                     )
                 }
             }
 
-            // ---------------- Контент группы ----------------
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // Фото животного
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -323,7 +380,10 @@ fun BeastsQuizScreen(onBackPressed: () -> Unit) {
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("Изображение не найдено: ${currentGroup.imageResName}", color = Color.Gray)
+                            Text(
+                                text = "Изображение не найдено: ${currentGroup.imageResName}",
+                                color = Color.Gray
+                            )
                         }
                     }
                 }
@@ -345,26 +405,23 @@ fun BeastsQuizScreen(onBackPressed: () -> Unit) {
                         selectedIndex = selectedAnswers[question.id],
                         isConfirmed = isCurrentGroupConfirmed,
                         onSelectOption = { optionIndex ->
-                            // После подтверждения текущей группы ответы менять нельзя
                             if (!isCurrentGroupConfirmed) {
                                 selectedAnswers[question.id] = optionIndex
                             }
                         }
                     )
+
                     Spacer(Modifier.height(14.dp))
                 }
 
                 Spacer(Modifier.height(12.dp))
 
-                // -------- Кнопки действия --------
                 when {
                     !isCurrentGroupConfirmed -> {
                         Button(
                             onClick = {
-                                // Подтверждаем группу (включаем подсветку)
                                 confirmedGroups[currentGroupIndex] = true
 
-                                // Если это последняя группа — сразу спрашиваем финальное подтверждение
                                 if (currentGroupIndex == groups.lastIndex) {
                                     showFinalDialog = true
                                 }
@@ -379,8 +436,9 @@ fun BeastsQuizScreen(onBackPressed: () -> Unit) {
 
                         if (!allThreeAnswered) {
                             Spacer(Modifier.height(8.dp))
+
                             Text(
-                                "Сначала выбери по одному ответу в каждом из трёх вопросов",
+                                text = "Сначала выбери по одному ответу в каждом из трёх вопросов",
                                 color = Color.Gray,
                                 fontSize = 12.sp
                             )
@@ -389,7 +447,9 @@ fun BeastsQuizScreen(onBackPressed: () -> Unit) {
 
                     isCurrentGroupConfirmed && currentGroupIndex < groups.lastIndex -> {
                         Button(
-                            onClick = { currentGroupIndex++ },
+                            onClick = {
+                                currentGroupIndex++
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp)
@@ -400,7 +460,9 @@ fun BeastsQuizScreen(onBackPressed: () -> Unit) {
 
                     isCurrentGroupConfirmed && currentGroupIndex == groups.lastIndex -> {
                         Button(
-                            onClick = { showFinalDialog = true },
+                            onClick = {
+                                showFinalDialog = true
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp)
@@ -415,13 +477,16 @@ fun BeastsQuizScreen(onBackPressed: () -> Unit) {
         }
     }
 
-    // -------- Финальный диалог подтверждения --------
     if (showFinalDialog) {
         AlertDialog(
-            onDismissRequest = { showFinalDialog = false },
-            title = { Text("Завершение викторины") },
+            onDismissRequest = {
+                showFinalDialog = false
+            },
+            title = {
+                Text("Завершение викторины")
+            },
             text = {
-                Text("Ты подтверждаешь ответы на последних вопросах. Если где-то не ответил(а), лучше вернись и проверь.")
+                Text("Ты подтверждаешь ответы на последних вопросах.\nЕсли где-то не ответил(а), лучше вернись и проверь.")
             },
             confirmButton = {
                 TextButton(
@@ -435,7 +500,9 @@ fun BeastsQuizScreen(onBackPressed: () -> Unit) {
             },
             dismissButton = {
                 TextButton(
-                    onClick = { showFinalDialog = false }
+                    onClick = {
+                        showFinalDialog = false
+                    }
                 ) {
                     Text("Отмена")
                 }
@@ -443,8 +510,6 @@ fun BeastsQuizScreen(onBackPressed: () -> Unit) {
         )
     }
 }
-
-// -------------------- QUESTION UI BLOCK --------------------
 
 @Composable
 private fun BeastsQuestionBlock(
@@ -473,8 +538,8 @@ private fun BeastsQuestionBlock(
                 val rowColor = when {
                     !isConfirmed -> Color.Transparent
                     !isSelected -> Color.Transparent
-                    option.isCorrect -> Color(0xFFB9F6CA) // зелёный
-                    else -> Color(0xFFFFCDD2) // красный
+                    option.isCorrect -> Color(0xFFB9F6CA)
+                    else -> Color(0xFFFFCDD2)
                 }
 
                 Row(
@@ -484,7 +549,9 @@ private fun BeastsQuestionBlock(
                         .background(rowColor)
                         .selectable(
                             selected = isSelected,
-                            onClick = { onSelectOption(index) },
+                            onClick = {
+                                onSelectOption(index)
+                            },
                             enabled = !isConfirmed
                         )
                         .padding(horizontal = 8.dp, vertical = 8.dp),
@@ -492,18 +559,21 @@ private fun BeastsQuestionBlock(
                 ) {
                     RadioButton(
                         selected = isSelected,
-                        onClick = null, // onClick уже на Row
+                        onClick = null,
                         enabled = !isConfirmed
                     )
+
                     Spacer(Modifier.width(8.dp))
-                    Text(option.text, fontSize = 14.sp)
+
+                    Text(
+                        text = option.text,
+                        fontSize = 14.sp
+                    )
                 }
             }
         }
     }
 }
-
-// -------------------- PARSER --------------------
 
 private fun parseBeastsQuizFromRaw(context: android.content.Context): List<BeastsRawGroup> {
     val text = context.resources.openRawResource(R.raw.beasts_quiz_text)
@@ -527,6 +597,7 @@ private fun parseBeastsQuizFromRaw(context: android.content.Context): List<Beast
 
     fun flushQuestionIfNeeded() {
         val qText = currentQuestionText
+
         if (qText != null && currentOptions.isNotEmpty()) {
             currentQuestions.add(
                 BeastsRawQuestion(
@@ -535,6 +606,7 @@ private fun parseBeastsQuizFromRaw(context: android.content.Context): List<Beast
                 )
             )
         }
+
         currentQuestionText = null
         currentOptions = mutableListOf()
     }
@@ -544,6 +616,7 @@ private fun parseBeastsQuizFromRaw(context: android.content.Context): List<Beast
 
         val name = currentAnimalName
         val image = currentImageResName
+
         if (name != null && image != null && currentQuestions.isNotEmpty()) {
             groups.add(
                 BeastsRawGroup(
@@ -561,37 +634,36 @@ private fun parseBeastsQuizFromRaw(context: android.content.Context): List<Beast
 
     for (rawLine in lines) {
         val line = rawLine.trim()
+
         if (line.isBlank()) continue
 
-        // 1) Заголовок группы: "Белка ph_0077_1"
         val headerMatch = headerRegex.find(line)
+
         if (headerMatch != null) {
-            // перед новой группой сохраняем старую
             flushGroupIfNeeded()
 
             currentAnimalName = headerMatch.groupValues[1].trim()
             currentImageResName = headerMatch.groupValues[2].trim()
+
             continue
         }
 
-        // 2) Вопрос: "1. ..."
         val questionMatch = questionRegex.find(line)
+
         if (questionMatch != null) {
-            // сохраняем предыдущий вопрос
             flushQuestionIfNeeded()
 
             currentQuestionText = questionMatch.groupValues[1].trim()
+
             continue
         }
 
-        // 3) Вариант: "а) ..."
         val optionMatch = optionRegex.find(line)
+
         if (optionMatch != null && currentQuestionText != null) {
             val rawOptionText = optionMatch.groupValues[1].trim()
-
             val isCorrect = rawOptionText.contains("верно", ignoreCase = true)
 
-            // удаляем пометки "верно" (включая дубли и тире)
             val cleaned = rawOptionText
                 .replace(Regex("""\s*[-–—]?\s*верно\b""", RegexOption.IGNORE_CASE), "")
                 .replace(Regex("""\s{2,}"""), " ")
@@ -603,26 +675,29 @@ private fun parseBeastsQuizFromRaw(context: android.content.Context): List<Beast
                     isCorrect = isCorrect
                 )
             )
+
             continue
         }
     }
 
-    // сохранить последнюю группу
     flushGroupIfNeeded()
 
-    // На всякий случай: если в какой-то группе >3 вопросов, режем по 3
-    // (у тебя как раз по 3, но защита не помешает)
     val normalized = mutableListOf<BeastsRawGroup>()
+
     for (group in groups) {
         if (group.questions.size <= 3) {
             normalized.add(group)
         } else {
-            // если вдруг текст собрал больше 3 вопросов в блок — разобьём
             val chunks = group.questions.chunked(3)
-            chunks.forEachIndexed { idx, chunk ->
+
+            chunks.forEachIndexed { index, chunk ->
                 normalized.add(
                     BeastsRawGroup(
-                        animalName = if (idx == 0) group.animalName else "${group.animalName} (${idx + 1})",
+                        animalName = if (index == 0) {
+                            group.animalName
+                        } else {
+                            "${group.animalName} (${index + 1})"
+                        },
                         imageResName = group.imageResName,
                         questions = chunk
                     )

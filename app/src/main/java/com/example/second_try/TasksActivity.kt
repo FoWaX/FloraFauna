@@ -17,6 +17,8 @@ import com.example.second_try.ui.components.AppTopBar
 import com.example.second_try.ui.theme.Second_tryTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 class TasksActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -107,18 +109,34 @@ fun TasksScreen(onNavigateBack: () -> Unit) {
                 targetQuizId = "dangerous_or_not"
             ),
             QuizMenuItem(
-                id = "beasts_quiz",
-                title = "Звери",
-                description = "Фото животного + 3 вопроса с подтверждением.",
-                launchMode = QuizLaunchMode.BEASTS
+                id = "beasts_quiz_1",
+                title = "Звери 1",
+                description = "Первая часть викторины по зверям: фото животного + 3 вопроса с подтверждением.",
+                launchMode = QuizLaunchMode.BEASTS,
+                targetQuizId = "1"
             ),
             QuizMenuItem(
-                id = "birds_text_quiz",
-                title = "Птицы",
-                description = "Большая викторина по птицам с выбором ответа.",
-                launchMode = QuizLaunchMode.BIRDS_TEXT
+                id = "beasts_quiz_2",
+                title = "Звери 2",
+                description = "Вторая часть викторины по зверям: фото животного + 3 вопроса с подтверждением.",
+                launchMode = QuizLaunchMode.BEASTS,
+                targetQuizId = "2"
             ),
-        )
+            QuizMenuItem(
+                id = "birds_quiz_1",
+                title = "Птицы 1",
+                description = "Первая часть викторины по птицам: один вопрос, одно фото и проверка ответа.",
+                launchMode = QuizLaunchMode.BIRDS_TEXT,
+                targetQuizId = "1"
+            ),
+            QuizMenuItem(
+                id = "birds_quiz_2",
+                title = "Птицы 2",
+                description = "Вторая часть викторины по птицам: один вопрос, одно фото и проверка ответа.",
+                launchMode = QuizLaunchMode.BIRDS_TEXT,
+                targetQuizId = "2"
+            ),
+            )
     }
 
     var doneMap by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
@@ -154,7 +172,8 @@ fun TasksScreen(onNavigateBack: () -> Unit) {
             contentAlignment = Alignment.Center
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier.padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -202,10 +221,15 @@ fun TasksScreen(onNavigateBack: () -> Unit) {
                             }
 
                             QuizLaunchMode.BEASTS -> {
-                                context.startActivity(Intent(context, BeastsQuizActivity::class.java))
+                                val intent = Intent(context, BeastsQuizActivity::class.java)
+                                intent.putExtra("quiz_part", item.targetQuizId?.toIntOrNull() ?: 1)
+                                context.startActivity(intent)
                             }
+
                             QuizLaunchMode.BIRDS_TEXT -> {
-                                context.startActivity(Intent(context, BirdsQuizActivity::class.java))
+                                val intent = Intent(context, BirdsQuizActivity::class.java)
+                                intent.putExtra("quiz_part", item.targetQuizId?.toIntOrNull() ?: 1)
+                                context.startActivity(intent)
                             }
                         }
                     }
