@@ -3,7 +3,6 @@ package com.example.second_try
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -41,16 +40,17 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import com.google.firebase.database.FirebaseDatabase
-import com.example.second_try.InvisibleSecretButton
 import android.content.SharedPreferences
-import kotlinx.coroutines.awaitCancellation
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
-
+import androidx.compose.foundation.BorderStroke
+import com.example.second_try.ui.theme.AppColors
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 
 lateinit var photoUri: Uri
 lateinit var takePictureLauncher: ActivityResultLauncher<Uri>
@@ -172,6 +172,32 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
+@Composable
+fun MainMenuButton(
+    text: String,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = AppColors.PrimaryGreen,
+            contentColor = Color.White
+        ),
+        border = BorderStroke(1.dp, AppColors.BorderDark),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(58.dp)
+            .padding(vertical = 6.dp)
+    ) {
+        Text(
+            text = text,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(modifier: Modifier = Modifier, onLogout: () -> Unit, onCameraClick: () -> Unit) {
@@ -213,6 +239,21 @@ fun MainScreen(modifier: Modifier = Modifier, onLogout: () -> Unit, onCameraClic
                 title = "Главное меню",
                 actions = {
                     val mainActivity = context as? MainActivity
+
+                    IconButton(
+                        onClick = {
+                            context.startActivity(
+                                Intent(context, LeaderboardActivity::class.java)
+                            )
+                        }
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_trophey),
+                            contentDescription = "Рейтинг",
+                            tint = Color.White
+                        )
+                    }
+
                     IconButton(
                         onClick = {
                             mainActivity?.let {
@@ -234,6 +275,8 @@ fun MainScreen(modifier: Modifier = Modifier, onLogout: () -> Unit, onCameraClic
                                 .padding(4.dp)
                         )
                     }
+
+
                 }
             )
         }
@@ -251,10 +294,10 @@ fun MainScreen(modifier: Modifier = Modifier, onLogout: () -> Unit, onCameraClic
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "FloraFauna",
-                    fontSize = 32.sp,
+                    text = "Чудеса природы",
+                    fontSize = 40.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF6200EE)
+                    color = AppColors.TextGreen
                 )
 
                 // 🔥 Секретная кнопка поверх текста
@@ -274,45 +317,30 @@ fun MainScreen(modifier: Modifier = Modifier, onLogout: () -> Unit, onCameraClic
                         .fillMaxHeight()
                         .padding(start = 0.dp)
                 ) {
-                    Button(
-                        onClick = { context.startActivity(Intent(context, ExploreActivity::class.java)) },
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    ) { Text("Познаем новое") }
+                    MainMenuButton(
+                        text = "Познаем новое",
+                        onClick = { context.startActivity(Intent(context, ExploreActivity::class.java)) }
+                    )
 
-                    Button(
-                        onClick = { context.startActivity(Intent(context, GalleryActivity::class.java)) },
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    ) { Text("Твоя коллекция фотографий") }
+                    MainMenuButton(
+                        text = "Твоя коллекция фотографий",
+                        onClick = { context.startActivity(Intent(context, GalleryActivity::class.java)) }
+                    )
 
-                    Button(
-                        onClick = { context.startActivity(Intent(context, CalendarActivity::class.java)) },
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    ) { Text("Календарь") }
+                    MainMenuButton(
+                        text = "Календарь",
+                        onClick = { context.startActivity(Intent(context, CalendarActivity::class.java)) }
+                    )
 
-                    Button(
-                        onClick = { context.startActivity(Intent(context, AchievementsActivity::class.java)) },
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    ) { Text("Достижения") }
+                    MainMenuButton(
+                        text = "Твои достижения",
+                        onClick = { context.startActivity(Intent(context, AchievementsActivity::class.java)) }
+                    )
 
-                    Button(
-                        onClick = { context.startActivity(Intent(context, TasksActivity::class.java)) },
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    ) { Text("Викторины") }
+                    MainMenuButton(
+                        text = "Викторины",
+                        onClick = { context.startActivity(Intent(context, TasksActivity::class.java)) }
+                    )
                 }
 
                 CharacterWithGreeting(
@@ -322,15 +350,26 @@ fun MainScreen(modifier: Modifier = Modifier, onLogout: () -> Unit, onCameraClic
 
                 Button(
                     onClick = onLogout,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AppColors.DarkGreen,
+                        contentColor = Color.White
+                    ),
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 16.dp)
-                ) { Text("Выйти") }
+                ) {
+                    Text(
+                        text = "Выйти",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
                 FloatingActionButton(
                     onClick = onCameraClick,
-                    containerColor = Color(0xFF6200EE),
+                    containerColor = AppColors.Coral,
+                    contentColor = Color.White,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(16.dp)
@@ -360,7 +399,7 @@ fun CharacterWithGreeting(greeting: String, modifier: Modifier = Modifier) {
         ) {
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFF0E68C)),
+                colors = CardDefaults.cardColors(containerColor = AppColors.LightGreen),
                 modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
             ) {
                 Text(

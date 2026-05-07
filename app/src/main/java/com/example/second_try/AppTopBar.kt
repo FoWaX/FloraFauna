@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.sp
 import com.example.second_try.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import com.example.second_try.ui.theme.AppColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,7 +96,7 @@ fun AppTopBar(
             }
         },
         colors = TopAppBarDefaults.smallTopAppBarColors(
-            containerColor = Color(0xFF6200EE)
+            containerColor = AppColors.DarkGreen
         )
     )
 }

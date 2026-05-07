@@ -25,7 +25,6 @@ import com.example.second_try.ui.components.AppTopBar
 import com.example.second_try.ui.theme.Second_tryTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
-import com.example.second_try.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -141,16 +140,16 @@ fun AchievementsScreen(onNavigateBack: () -> Unit) {
         Achievement("perfect_quiz1", "Безошибочный! Кто есть кто?", R.drawable.ic_medal, perfectQuiz1),
         Achievement("perfect_quiz2", "Безошибочный! Земноводные", R.drawable.ic_medal, perfectQuiz2),
         Achievement("perfect_quiz3", "Безошибочный! Пресмыкающиеся", R.drawable.ic_medal, perfectQuiz3),
-        Achievement("perfect_all_quizzes", "Абсолютно безошибочный!", R.drawable.ic_trophy, perfectAllQuizzes),
+        Achievement("perfect_all_quizzes", "Абсолютно безошибочный!", R.drawable.ic_trophey, perfectAllQuizzes),
 
         Achievement("quiz1_done", "Первый шаг", R.drawable.ic_medal, quiz1Done),
-        Achievement("all_quizzes_done", "Все викторины", R.drawable.ic_trophy, allQuizzesDone),
+        Achievement("all_quizzes_done", "Все викторины", R.drawable.ic_trophey, allQuizzesDone),
         Achievement("first_photo", "Первое фото", R.drawable.camera, photosSaved >= 1),
         Achievement("photos", "Фотограф природы", R.drawable.camera, photosSaved >= 5),
-        Achievement("master_photo", "Мастер кадра", R.drawable.ic_trophy, masterPhotoUnlocked),
+        Achievement("master_photo", "Мастер кадра", R.drawable.ic_trophey, masterPhotoUnlocked),
         Achievement("zoologist", "Зоолог-любитель", R.drawable.ic_medal, zoologistUnlocked),
-        Achievement("herpetologist", "Герпетолог", R.drawable.ic_trophy, herpetologistUnlocked),
-        Achievement("all_cards", "Просмотрел всё", R.drawable.ic_trophy, allCardsUnlocked)
+        Achievement("herpetologist", "Герпетолог", R.drawable.ic_trophey, herpetologistUnlocked),
+        Achievement("all_cards", "Просмотрел всё", R.drawable.ic_trophey, allCardsUnlocked)
     )
 
     // 2. сохраняем достижения и выдаём шишки (логика похожа на уже существующую)
