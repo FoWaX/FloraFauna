@@ -166,7 +166,7 @@ fun ProfileScreen(onNavigateBack: () -> Unit) {
 
             Spacer(Modifier.height(24.dp))
             ProfileField("Уровень", "$level")
-            ProfileField("Количество шишек", profileData["cones"] ?: "")
+            ProfileField("Количество малинок", profileData["cones"] ?: "")
             ProfileField("Дата регистрации", registrationDate)
             ProfileField("Количество фотографий", profileData["photosSaved"] ?: "")
             ProfileField("Количество достижений", achievementsCount.toString())

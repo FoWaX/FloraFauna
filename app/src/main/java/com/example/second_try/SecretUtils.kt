@@ -46,10 +46,10 @@ fun InvisibleSecretButton(
             title = { Text("Ты нашёл секрет!") },
             text = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Получаешь +30 шишек 🎉")
+                    Text("Получаешь +30 малинок 🎉")
                     Spacer(modifier = Modifier.height(8.dp))
                     Image(
-                        painter = painterResource(id = R.drawable.ic_cone),
+                        painter = painterResource(id = R.drawable.prize),
                         contentDescription = "Награда",
                         modifier = Modifier.size(80.dp)
                     )

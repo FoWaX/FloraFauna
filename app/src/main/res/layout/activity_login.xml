@@ -5,6 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/app_background"
     tools:context=".LoginActivity">
 
     <!-- Заголовок страницы -->
@@ -16,8 +17,9 @@
         android:layout_marginStart="20dp"
         android:text="Вход"
         android:textSize="24sp"
+        android:textStyle="bold"
         android:gravity="center"
-        android:textColor="@android:color/black"
+        android:textColor="@color/app_text_green"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
@@ -29,7 +31,7 @@
         android:text="Пожалуйста, введите свой email адрес и пароль, чтобы зайти в свой аккаунт."
         android:textSize="16sp"
         android:gravity="start"
-        android:textColor="@android:color/black"
+        android:textColor="@color/app_text_dark"
         android:layout_marginTop="8dp"
         android:layout_marginStart="20dp"
         android:layout_marginEnd="20dp"
@@ -48,7 +50,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- Контейнер для полей ввода (Email и Password) с разделительной линией -->
+        <!-- Контейнер для полей ввода с разделительной линией -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -61,15 +63,16 @@
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
                 android:hint="Email"
-                android:textColor="@android:color/black"
+                android:textColor="@color/app_text_dark"
+                android:textColorHint="@color/app_text_gray"
                 android:inputType="textEmailAddress"
                 android:paddingStart="16dp" />
 
             <!-- Разделительная линия -->
             <View
                 android:layout_width="match_parent"
-                android:layout_height="2dp"
-                android:background="#000000" /> <!-- Линия разделителя -->
+                android:layout_height="1dp"
+                android:background="@color/app_dark_green" />
 
             <!-- Поле для ввода Password -->
             <EditText
@@ -77,7 +80,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
                 android:hint="Пароль"
-                android:textColor="@android:color/black"
+                android:textColor="@color/app_text_dark"
+                android:textColorHint="@color/app_text_gray"
                 android:inputType="textPassword"
                 android:paddingStart="16dp" />
 
@@ -85,7 +89,7 @@
 
     </LinearLayout>
 
-    <!-- Лейаут для кнопки "Login" -->
+    <!-- Кнопка "Войти" -->
     <LinearLayout
         android:id="@+id/login_button_layout"
         android:layout_width="match_parent"
@@ -104,7 +108,7 @@
             android:text="Войти" />
     </LinearLayout>
 
-    <!-- Текстовая строка под заголовком -->
+    <!-- Текстовая строка под кнопкой -->
     <TextView
         android:id="@+id/registration_subtitle"
         android:layout_width="match_parent"
@@ -112,14 +116,14 @@
         android:text="Ещё не зарегистрированы?"
         android:textSize="16sp"
         android:gravity="center"
-        android:textColor="@android:color/black"
+        android:textColor="@color/app_text_gray"
         android:layout_marginTop="8dp"
         android:layout_marginStart="20dp"
         app:layout_constraintTop_toBottomOf="@id/login_button_layout"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Лейаут для кнопки "Register" -->
+    <!-- Кнопка "Зарегистрироваться" -->
     <LinearLayout
         android:id="@+id/register_button_layout"
         android:layout_width="match_parent"

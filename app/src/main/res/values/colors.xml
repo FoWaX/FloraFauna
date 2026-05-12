@@ -7,4 +7,17 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- App color palette (matches AppColors in Color.kt) -->
+    <color name="app_background">#FFFFFFFF</color>
+    <color name="app_dark_green">#FF2E5D3A</color>
+    <color name="app_primary_green">#FF4B8D25</color>
+    <color name="app_text_green">#FF385B26</color>
+    <color name="app_light_green">#FFDDF3A5</color>
+    <color name="app_coral">#FFE87563</color>
+    <color name="app_coral_light">#FFFFD6CD</color>
+    <color name="app_text_dark">#FF1F2A1D</color>
+    <color name="app_text_gray">#FF6B6B6B</color>
+    <color name="app_border_dark">#FF1A2A16</color>
+    <color name="app_warm_card">#FFFFF8E8</color>
 </resources>

@@ -89,8 +89,8 @@ fun AppTopBar(
                     modifier = Modifier.padding(end = 4.dp)
                 )
                 Image(
-                    painter = painterResource(id = R.drawable.ic_cone),
-                    contentDescription = "Шишки",
+                    painter = painterResource(id = R.drawable.prize),
+                    contentDescription = "Малинки",
                     modifier = Modifier.size(24.dp)
                 )
             }

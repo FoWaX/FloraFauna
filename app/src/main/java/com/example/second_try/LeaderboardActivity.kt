@@ -133,7 +133,7 @@ fun LeaderboardScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Здесь показаны пользователи от первого к последнему по количеству шишек.",
+                text = "Здесь показаны пользователи от первого к последнему по количеству малинок.",
                 fontSize = 15.sp,
                 color = AppColors.TextGray
             )
@@ -241,15 +241,15 @@ fun LeaderboardUserCard(
                 )
 
                 Text(
-                    text = "Шишек: ${user.cones}",
+                    text = "Малинок: ${user.cones}",
                     fontSize = 14.sp,
                     color = AppColors.TextGray
                 )
             }
 
             Image(
-                painter = painterResource(id = R.drawable.ic_cone),
-                contentDescription = "Шишки",
+                painter = painterResource(id = R.drawable.prize),
+                contentDescription = "Малинки",
                 modifier = Modifier.size(30.dp)
             )
         }
