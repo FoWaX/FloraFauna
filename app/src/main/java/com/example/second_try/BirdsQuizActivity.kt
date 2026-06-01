@@ -92,7 +92,8 @@ fun BirdsQuizScreen(
     }
 
     val questions = remember(quizPart) {
-        buildBirdsQuizQuestions(quizPart)
+        val all = parseBirdsQuiz(context)
+        if (quizPart == 1) all.take(22) else all.drop(22)
     }
 
     val doneKey = remember(quizPart) {
@@ -102,6 +103,12 @@ fun BirdsQuizScreen(
     val perfectKey = remember(quizPart) {
         if (quizPart == 1) "perfect_birds_quiz_1" else "perfect_birds_quiz_2"
     }
+
+    val halfRewardedKey = remember(quizPart) {
+        if (quizPart == 1) "birds_quiz_1_half_rewarded" else "birds_quiz_2_half_rewarded"
+    }
+
+    var halfRewarded by rememberSaveable(quizPart) { mutableStateOf(false) }
 
     var currentIndex by rememberSaveable(quizPart) { mutableStateOf(0) }
     var selectedAnswers by rememberSaveable(quizPart) { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -127,6 +134,20 @@ fun BirdsQuizScreen(
             if (correctCount == totalQuestions) {
                 dbRef.child(perfectKey).setValue(true)
             }
+
+            if (correctCount * 2 >= totalQuestions) {
+                dbRef.child(halfRewardedKey).get().addOnSuccessListener { snap ->
+                    if (snap.getValue(Boolean::class.java) != true) {
+                        halfRewarded = true
+                        dbRef.child(halfRewardedKey).setValue(true)
+                        val conesRef = dbRef.parent!!.child("cones")
+                        conesRef.get().addOnSuccessListener { conesSnap ->
+                            val cur = conesSnap.getValue(Int::class.java) ?: 0
+                            conesRef.setValue(cur + 75)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -144,6 +165,7 @@ fun BirdsQuizScreen(
                 quizPart = quizPart,
                 correctCount = correctCount,
                 totalQuestions = totalQuestions,
+                halfRewarded = halfRewarded,
                 onBackToTasks = {
                     context.startActivity(Intent(context, TasksActivity::class.java))
                 },
@@ -389,6 +411,7 @@ private fun BirdsQuizResultScreen(
     quizPart: Int,
     correctCount: Int,
     totalQuestions: Int,
+    halfRewarded: Boolean,
     onBackToTasks: () -> Unit,
     onBackToMain: () -> Unit
 ) {
@@ -415,6 +438,16 @@ private fun BirdsQuizResultScreen(
                     text = "Верных ответов: $correctCount из $totalQuestions",
                     fontSize = 17.sp
                 )
+
+                if (halfRewarded) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "🍓 +75 малинок за прохождение теста!",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF2E7D32)
+                    )
+                }
             }
         }
 
@@ -438,393 +471,64 @@ private fun BirdsQuizResultScreen(
     }
 }
 
-private fun buildBirdsQuizQuestions(quizPart: Int): List<BirdsQuestion> {
-    val allQuestions = listOf(
-        q(
-            id = "q1",
-            imageResName = "ph_0151_1",
-            text = "Размах крыльев у беркута до",
-            a = "1 метра" to false,
-            b = "2,5 метров" to true,
-            c = "3,5 метров" to false
-        ),
-        q(
-            id = "q2",
-            imageResName = "ph_0151_1",
-            text = "Беркут, орлан-белохвост и орел степной занесены",
-            a = "только в Красную книгу РФ" to false,
-            b = "только в Красную книгу СО" to false,
-            c = "в обе Книги" to true
-        ),
-        q(
-            id = "q3",
-            imageResName = "ph_0150_1",
-            text = "Численность дрофы сокращается из-за",
-            a = "изменения климата" to false,
-            b = "строительства городов" to false,
-            c = "браконьерства и распашки земель" to true
-        ),
-        q(
-            id = "q4",
-            imageResName = "ph_0150_1",
-            text = "«Дрофа» в переводе с древнеславянского",
-            a = "«Большая птица»" to false,
-            b = "«Бегущая птица»" to true,
-            c = "«Тяжёлая птица»" to false
-        ),
-        q(
-            id = "q5",
-            imageResName = "ph_0152_1",
-            text = "Способ охоты филина:",
-            a = "долго преследует жертву в полёте" to false,
-            b = "атакует из засады, бесшумно пикируя" to true,
-            c = "загоняет добычу стаей" to false
-        ),
-        q(
-            id = "q6",
-            imageResName = "ph_0153_1",
-            text = "Страуса африканского в Саратовской области",
-            a = "разводят и выпускают в природу" to false,
-            b = "можно увидеть только в цирке" to false,
-            c = "содержат на специальных фермах" to true
-        ),
-        q(
-            id = "q7",
-            imageResName = "ph_0154_1",
-            text = "У журавлей есть интересная особенность поведения, они",
-            a = "умеют петь сложные песни" to false,
-            b = "часто танцуют, особенно в период размножения" to true,
-            c = "строят гнёзда на кустах" to false
-        ),
-        q(
-            id = "q8",
-            imageResName = "ph_0154_1",
-            text = "Стая журавлей во время перелёта выглядит как",
-            a = "шеренга (линия)" to false,
-            b = "клин" to true,
-            c = "беспорядочная группа" to false
-        ),
-        q(
-            id = "q9",
-            imageResName = "ph_0155_1",
-            text = "Почему королёк получил такое название?",
-            a = "потому что поёт слово «ко-роль»" to false,
-            b = "из-за «короны» на голове" to true,
-            c = "он самый сильный среди мелких птиц" to false
-        ),
-        q(
-            id = "q10",
-            imageResName = "ph_0155_1",
-            text = "Королька в Саратовской области можно встретить",
-            a = "только в хвойных лесах" to true,
-            b = "в любом лесу или парке" to false,
-            c = "вблизи водоёмов" to false
-        ),
-        q(
-            id = "q11",
-            imageResName = "ph_0156_1",
-            text = "Воробьиный сыч отличается от других сов тем, что он",
-            a = "не охотится на мышей" to false,
-            b = "может охотиться и ночью, и днём" to true,
-            c = "строит гнёзда на земле" to false
-        ),
-        q(
-            id = "q12",
-            imageResName = "ph_0158_1",
-            text = "Вальдшнеп, в отличие от других куликов, живет",
-            a = "на открытых болотах" to false,
-            b = "на песчаных отмелях рек" to false,
-            c = "в густых лесах" to true
-        ),
-        q(
-            id = "q13",
-            imageResName = "ph_0158_1",
-            text = "Длинный клюв нужен вальдшнепу для",
-            a = "отличия самца от самки" to false,
-            b = "добычи червей и насекомых из лесной почвы" to true,
-            c = "защиты от хищников" to false
-        ),
-        q(
-            id = "q14",
-            imageResName = "ph_0159_1",
-            text = "Самцу фазана яркая окраска нужна, чтобы",
-            a = "отпугивать хищников" to false,
-            b = "привлекать самок в брачный период" to true,
-            c = "маскироваться летом среди цветов" to false
-        ),
-        q(
-            id = "q15",
-            imageResName = "ph_0157_1",
-            text = "Соперники фазана по яркости окраски:",
-            a = "беркут и орлан-белохвост" to false,
-            b = "сизоворонка, щурка и зимородок" to true,
-            c = "журавль и дрофа" to false
-        ),
-        q(
-            id = "q16",
-            imageResName = "ph_0160_1",
-            text = "Серые куропатки осенью и зимой живут",
-            a = "поодиночке" to false,
-            b = "стайками" to true,
-            c = "парами" to false
-        ),
-        q(
-            id = "q17",
-            imageResName = "ph_0160_1",
-            text = "Серая куропатка устраивает своё гнездо",
-            a = "в густых кустах" to false,
-            b = "на земле" to true,
-            c = "в дуплах деревьев" to false
-        ),
-        q(
-            id = "q18",
-            imageResName = "ph_0161_1",
-            text = "Выпь при опасности",
-            a = "ныряет глубоко под воду" to false,
-            b = "улетает прочь" to false,
-            c = "вытягивается вертикально и сливается с тростником" to true
-        ),
-        q(
-            id = "q19",
-            imageResName = "ph_0161_1",
-            text = "Народное название выпи – «речной бык» или «бугай» за",
-            a = "большой размер" to false,
-            b = "громкие звуки, похожие на рев" to true,
-            c = "бурый цвет оперения" to false
-        ),
-        q(
-            id = "q20",
-            imageResName = "ph_0162_1",
-            text = "Большой баклан после ныряния",
-            a = "греется на солнце лёжа" to false,
-            b = "сушит крылья, растопырив их" to true,
-            c = "распушает перья на голове" to false
-        ),
-        q(
-            id = "q21",
-            imageResName = "ph_0162_1",
-            text = "Бакланы по манере летать стаей похожи на",
-            a = "журавлей (друг за другом в цепочку)" to false,
-            b = "гусей (клином)" to true,
-            c = "стрижей (беспорядочной стаей)" to false
-        ),
-        q(
-            id = "q22",
-            imageResName = "ph_0163_1",
-            text = "Гнездо чомги необычное, оно",
-            a = "сплетено из толстых веток" to false,
-            b = "расположено высоко на дереве" to false,
-            c = "плавает по воде" to true
-        ),
-        q(
-            id = "q23",
-            imageResName = "ph_0163_1",
-            text = "Как маленькие птенцы чомги передвигаются вместе с матерью?",
-            a = "плавают на ее спине" to true,
-            b = "летят за ней" to false,
-            c = "бегут за ней по берегу" to false
-        ),
-        q(
-            id = "q24",
-            imageResName = "ph_0164_1",
-            text = "Щурка устраивает гнездо для птенцов в",
-            a = "дуплах деревьев" to false,
-            b = "старых птичьих гнёздах" to false,
-            c = "норах, которые роет в песчаных обрывах" to true
-        ),
-        q(
-            id = "q25",
-            imageResName = "ph_0164_1",
-            text = "Основная угроза для щурок со стороны человека связана с",
-            a = "отловом для зоопарков" to false,
-            b = "разрушением берегов водоёмов" to false,
-            c = "уничтожением этих птиц пчеловодами" to true
-        ),
-        q(
-            id = "q26",
-            imageResName = "ph_0165_1",
-            text = "Какую тактику охоты использует мухоловка-белошейка?",
-            a = "активно преследует насекомых в воздухе" to false,
-            b = "собирает насекомых с земли" to false,
-            c = "выслеживает с ветки, хватает в воздухе и возвращается" to true
-        ),
-        q(
-            id = "q27",
-            imageResName = "ph_0165_1",
-            text = "Зимует мухоловка-белошейка",
-            a = "в Юго-Восточной Азии" to false,
-            b = "остаётся зимовать в наших лесах" to false,
-            c = "в Африке, на юге Сахары" to true
-        ),
-        q(
-            id = "q28",
-            imageResName = "ph_0166_1",
-            text = "Поползень лазает по дереву",
-            a = "только снизу вверх" to false,
-            b = "опираясь на хвост" to false,
-            c = "и вверх, и вниз" to true
-        ),
-        q(
-            id = "q29",
-            imageResName = "ph_0166_1",
-            text = "Чем питается поползень осенью и что он делает с едой?",
-            a = "ест только насекомых, запасов не делает" to false,
-            b = "ест ягоды, потом улетает на юг" to false,
-            c = "ест семена, запасы прячет, запоминая места" to true
-        ),
-        q(
-            id = "q30",
-            imageResName = "ph_0167_1",
-            text = "Что делает гнездо ремеза уникальным? Оно",
-            a = "построено из глины и веток" to false,
-            b = "в форме варежки, из пуха, подвешено на конце ветки" to true,
-            c = "находится под землёй в норе" to false
-        ),
-        q(
-            id = "q31",
-            imageResName = "ph_0167_1",
-            text = "Ремез для склеивания своего гнезда использует",
-            a = "собственную слюну" to false,
-            b = "паутину" to true,
-            c = "ил и грязь" to false
-        ),
-        q(
-            id = "q32",
-            imageResName = "ph_0168_1",
-            text = "Интеллект ворона",
-            a = "самый низкий среди птиц" to false,
-            b = "один из самых высоких" to true,
-            c = "обычный для всех врановых птиц" to false
-        ),
-        q(
-            id = "q33",
-            imageResName = "ph_0168_1",
-            text = "Ворон в полёте может",
-            a = "хватать птиц" to false,
-            b = "переворачиваться и лететь вниз спиной" to true,
-            c = "петлять между деревьями с большой скоростью" to false
-        ),
-        q(
-            id = "q34",
-            imageResName = "ph_0169_1",
-            text = "Какую способность голубей использовали раньше люди?",
-            a = "подражать человеческой речи" to false,
-            b = "находить дорогу домой за сотни километров" to true,
-            c = "видеть в полной темноте" to false
-        ),
-        q(
-            id = "q35",
-            imageResName = "ph_0169_1",
-            text = "Для голубей является вредной",
-            a = "хлеб, особенно с плесенью" to true,
-            b = "зерновая смесь для мелких птиц" to false,
-            c = "овёс и пшеница" to false
-        ),
-        q(
-            id = "q36",
-            imageResName = "ph_0170_1",
-            text = "Соловьиные песни в природе означают",
-            a = "призыв сородичей к еде" to false,
-            b = "предупреждение об опасности" to false,
-            c = "сигнал, что территория занята для гнездования" to true
-        ),
-        q(
-            id = "q37",
-            imageResName = "ph_0170_1",
-            text = "Название «соловей» произошло от слова",
-            a = "«соль», потому что он любит солонцы" to false,
-            b = "означающего «буроватый или серый» цвет" to true,
-            c = "«слава», за его знаменитое пение" to false
-        ),
-        q(
-            id = "q38",
-            imageResName = "ph_0171_1",
-            text = "Что необычного в голосе иволги? Она",
-            a = "не издаёт звуков вообще" to false,
-            b = "подражает другим птицам" to false,
-            c = "поет мелодично или громко кричит, как кошка" to true
-        ),
-        q(
-            id = "q39",
-            imageResName = "ph_0172_1",
-            text = "Как охотится сизоворонка?",
-            a = "выслеживает добычу на земле, бегая за ней" to false,
-            b = "сидит на ветке и пикирует вниз на добычу" to true,
-            c = "ловит насекомых на лету в воздухе" to false
-        ),
-        q(
-            id = "q40",
-            imageResName = "ph_0172_1",
-            text = "Сизоворонка зимует",
-            a = "в Южной Америке" to false,
-            b = "остается зимовать у нас" to false,
-            c = "в Северной Африке" to true
-        ),
-        q(
-            id = "q41",
-            imageResName = "ph_0173_1",
-            text = "Снегирь питается зимой",
-            a = "насекомыми под корой" to false,
-            b = "исключительно семенами из шишек" to false,
-            c = "ягодами и почками деревьев" to true
-        ),
-        q(
-            id = "q42",
-            imageResName = "ph_0175_1",
-            text = "Так же, как и снегирь, только зимой появляется у нас",
-            a = "свиристель" to true,
-            b = "клест" to false,
-            c = "синица большая" to false
-        ),
-        q(
-            id = "q43",
-            imageResName = "ph_0174_1",
-            text = "Какой отличительный признак есть на голове удода?",
-            a = "хохолок из синих перьев" to false,
-            b = "«корона» из рыжих перьев с чёрными кончиками" to true,
-            c = "голая красная кожа" to false
-        ),
-        q(
-            id = "q44",
-            imageResName = "ph_0174_1",
-            text = "Как самка удода защищает своё гнездо?",
-            a = "нападает клювом на врага" to false,
-            b = "притворяется раненой, чтобы увести от гнезда" to false,
-            c = "может «выстрелить» сильно пахнущим помётом" to true
-        ),
-        q(
-            id = "q45",
-            imageResName = "ph_0174_1",
-            text = "Куда улетает удод зимовать?",
-            a = "в Южную Америку" to false,
-            b = "в Африку" to true,
-            c = "в Индию" to false
-        )
-    )
+private fun parseBirdsQuiz(context: android.content.Context): List<BirdsQuestion> {
+    val text = context.resources.openRawResource(R.raw.quiz_birds)
+        .bufferedReader(Charsets.UTF_8)
+        .use { it.readText() }
 
-    return if (quizPart == 1) {
-        allQuestions.take(22)
-    } else {
-        allQuestions.drop(22)
+    val questions = mutableListOf<BirdsQuestion>()
+    val optionRegex = Regex("""^([а-яёА-ЯЁ])\)\s*(.+)$""")
+
+    var currentImage: String? = null
+    var currentQuestion: String? = null
+    var currentOptions = mutableListOf<Pair<String, Boolean>>()
+
+    fun flush() {
+        val img = currentImage ?: return
+        val q = currentQuestion ?: return
+        if (currentOptions.isNotEmpty()) {
+            val qId = "q${questions.size + 1}"
+            questions.add(
+                BirdsQuestion(
+                    id = qId,
+                    imageResName = img,
+                    text = q,
+                    options = currentOptions.mapIndexed { i, (optText, isCorrect) ->
+                        BirdsOption(id = "${qId}_$i", text = optText, isCorrect = isCorrect)
+                    }
+                )
+            )
+        }
+        currentImage = null; currentQuestion = null; currentOptions = mutableListOf()
     }
-}
 
-private fun q(
-    id: String,
-    imageResName: String,
-    text: String,
-    a: Pair<String, Boolean>,
-    b: Pair<String, Boolean>,
-    c: Pair<String, Boolean>
-): BirdsQuestion {
-    return BirdsQuestion(
-        id = id,
-        imageResName = imageResName,
-        text = text,
-        options = listOf(
-            BirdsOption(id = "${id}_a", text = "а) ${a.first}", isCorrect = a.second),
-            BirdsOption(id = "${id}_b", text = "б) ${b.first}", isCorrect = b.second),
-            BirdsOption(id = "${id}_c", text = "в) ${c.first}", isCorrect = c.second)
-        )
-    )
+    for (rawLine in text.lines()) {
+        val line = rawLine.trim()
+        if (line.isBlank()) continue
+
+        if (line.matches(Regex("ph_\\d+_\\d+"))) {
+            flush()
+            currentImage = line
+            continue
+        }
+
+        if (line.startsWith("? ")) {
+            currentQuestion = line.removePrefix("? ").trim()
+            continue
+        }
+
+        val optionMatch = optionRegex.find(line)
+        if (optionMatch != null) {
+            val letter = optionMatch.groupValues[1]
+            val rawText = optionMatch.groupValues[2]
+            val isCorrect = rawText.contains(" - верно", ignoreCase = true)
+            val cleanText = rawText
+                .replace(Regex("""\s*-\s*верно\s*$""", RegexOption.IGNORE_CASE), "")
+                .trim()
+            currentOptions.add(Pair("$letter) $cleanText", isCorrect))
+            continue
+        }
+    }
+    flush()
+    return questions
 }

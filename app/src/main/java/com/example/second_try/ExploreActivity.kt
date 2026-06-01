@@ -132,6 +132,8 @@ fun ExploreHost() {
 
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
 
+    val mammalsAlphabetScrollState = rememberScrollState()
+
     val searchIndex = remember(data, dangerousData, mammalsData, birdsData) {
         buildSearchIndex(
             mainData = data,
@@ -182,7 +184,8 @@ fun ExploreHost() {
                 onOpenClasses = { screen = Screen.ClassesMenu },
                 onOpenDangerous = { screen = Screen.DangerousHome },
                 onOpenMammals = { screen = Screen.MammalsSections(0) },
-                onOpenBirds = { screen = Screen.BirdsList }
+                onOpenBirds = { screen = Screen.BirdsList },
+                onBack = { (context as android.app.Activity).finish() }
             )
         }
         is Screen.ClassesMenu -> {
@@ -253,6 +256,7 @@ fun ExploreHost() {
         is Screen.MammalsSections -> {
             MammalsAlphabetScreen(
                 onBack = { screen = Screen.Home },
+                scrollState = mammalsAlphabetScrollState,
                 onOpenIntro = {
                     screen = Screen.MammalsIntroDetail
                 },
@@ -337,11 +341,12 @@ fun ExploreHomeScreen(
     onOpenClasses: () -> Unit,
     onOpenDangerous: () -> Unit,
     onOpenMammals: () -> Unit,
-    onOpenBirds: () -> Unit
+    onOpenBirds: () -> Unit,
+    onBack: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
-            AppTopBar(title = "Познаем новое", onBack = {})
+            AppTopBar(title = "Познаем новое", onBack = onBack)
         }
     ) { padding ->
         Column(
@@ -416,7 +421,7 @@ fun ExploreHomeScreen(
                     .fillMaxWidth()
                     .height(64.dp)
             ) {
-                Text("Млекопитающие", fontSize = 18.sp)
+                Text("Наши звери от А до Я", fontSize = 18.sp)
             }
 
             Spacer(Modifier.height(16.dp))
@@ -469,11 +474,18 @@ fun BirdsTopicListScreen(
                             Image(
                                 painter = painterResource(id = resId),
                                 contentDescription = topic.title,
-                                modifier = Modifier.size(80.dp),
-                                contentScale = ContentScale.Crop
+                                modifier = Modifier
+                                    .width(90.dp)
+                                    .height(70.dp),
+                                contentScale = ContentScale.Fit
                             )
                         } else {
-                            Box(modifier = Modifier.size(80.dp), contentAlignment = Alignment.Center) {
+                            Box(
+                                modifier = Modifier
+                                    .width(90.dp)
+                                    .height(70.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Text("Нет фото", fontSize = 12.sp, color = Color.Gray)
                             }
                         }
@@ -602,6 +614,7 @@ fun MammalsInfoCard(
 @Composable
 fun MammalsAlphabetScreen(
     onBack: () -> Unit,
+    scrollState: androidx.compose.foundation.ScrollState,
     onOpenIntro: () -> Unit,
     onOpenList: () -> Unit,
     onOpenTopic: (blockIndex: Int, sectionIndex: Int, topicIndex: Int) -> Unit,
@@ -635,7 +648,7 @@ fun MammalsAlphabetScreen(
         Column(
             modifier = Modifier
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(16.dp)
         ) {
             Text(
@@ -696,12 +709,16 @@ fun MammalsAlphabetScreen(
                                 Image(
                                     painter = painterResource(id = resId),
                                     contentDescription = topic.title,
-                                    modifier = Modifier.size(80.dp),
-                                    contentScale = ContentScale.Crop
+                                    modifier = Modifier
+                                        .width(90.dp)
+                                        .height(70.dp),
+                                    contentScale = ContentScale.Fit
                                 )
                             } else {
                                 Box(
-                                    modifier = Modifier.size(80.dp),
+                                    modifier = Modifier
+                                        .width(90.dp)
+                                        .height(70.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
@@ -873,11 +890,18 @@ fun TopicListScreen(onBack: () -> Unit, onOpenTopic: (Int) -> Unit, section: Ani
                             Image(
                                 painter = painterResource(id = resId),
                                 contentDescription = topic.title,
-                                modifier = Modifier.size(80.dp),
-                                contentScale = ContentScale.Crop
+                                modifier = Modifier
+                                    .width(90.dp)
+                                    .height(70.dp),
+                                contentScale = ContentScale.Fit
                             )
                         } else {
-                            Box(modifier = Modifier.size(80.dp), contentAlignment = Alignment.Center) {
+                            Box(
+                                modifier = Modifier
+                                    .width(90.dp)
+                                    .height(70.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Text("Нет фото", fontSize = 12.sp, color = Color.Gray)
                             }
                         }
@@ -1038,11 +1062,18 @@ fun DangerousTopicListScreen(onBack: () -> Unit, onOpenTopic: (Int) -> Unit, sec
                             Image(
                                 painter = painterResource(id = resId),
                                 contentDescription = topic.title,
-                                modifier = Modifier.size(80.dp),
-                                contentScale = ContentScale.Crop
+                                modifier = Modifier
+                                    .width(90.dp)
+                                    .height(70.dp),
+                                contentScale = ContentScale.Fit
                             )
                         } else {
-                            Box(modifier = Modifier.size(80.dp), contentAlignment = Alignment.Center) {
+                            Box(
+                                modifier = Modifier
+                                    .width(90.dp)
+                                    .height(70.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Text("Нет фото", fontSize = 12.sp, color = Color.Gray)
                             }
                         }
@@ -1608,7 +1639,7 @@ fun buildDangerousAnimalsData(context: Context): List<AnimalClassBlock> {
                         title = "Шмели",
                         imageResName = img("ph_0032_1"),
                         viewedId = "danger_ph_0032_1",
-                        text = "Жалят редко; атакуют при угрозе гнезду."
+                        text = "Наиболее миролюбивые среди всех жалящих перепончатокрылых. Жалят очень редко и не так больно. Нападают шмели только в случае угрозы их гнезду."
                     ),
                     AnimalTopic(
                         title = "Оса обыкновенная",
@@ -1813,7 +1844,7 @@ fun buildDangerousAnimalsData(context: Context): List<AnimalClassBlock> {
 
     // Млекопитающие
     val mammals = AnimalClassBlock(
-        title = "Наши звери от А до Я",
+        title = "Млекопитающие",
         sections = listOf(
             AnimalSection(
                 title = "Хищные",
@@ -1872,7 +1903,7 @@ fun buildMammalsData(context: Context): List<AnimalClassBlock> {
     fun img(name: String) = name
 
     val mammals = AnimalClassBlock(
-        title = "Класс Млекопитающие",
+        title = "Наши звери от А до Я",
         sections = listOf(
             AnimalSection(
                 title = "Отряд Насекомоядные",

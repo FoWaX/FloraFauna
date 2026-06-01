@@ -16,9 +16,13 @@ import androidx.compose.ui.unit.sp
 import com.example.second_try.ui.components.AppTopBar
 import com.example.second_try.ui.theme.Second_tryTheme
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.font.FontWeight
 
 class TasksActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -142,15 +146,20 @@ fun TasksScreen(onNavigateBack: () -> Unit) {
     var doneMap by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     var dialogQuiz by remember { mutableStateOf<QuizMenuItem?>(null) }
 
-    LaunchedEffect(Unit) {
-        dbRef.get().addOnSuccessListener { snapshot ->
-            val loaded = mutableMapOf<String, Boolean>()
-            quizItems.forEach { item ->
-                loaded["${item.id}_done"] =
-                    snapshot.child("${item.id}_done").getValue(Boolean::class.java) ?: false
+    DisposableEffect(dbRef) {
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val loaded = mutableMapOf<String, Boolean>()
+                quizItems.forEach { item ->
+                    loaded["${item.id}_done"] =
+                        snapshot.child("${item.id}_done").getValue(Boolean::class.java) ?: false
+                }
+                doneMap = loaded
             }
-            doneMap = loaded
+            override fun onCancelled(error: DatabaseError) {}
         }
+        dbRef.addValueEventListener(listener)
+        onDispose { dbRef.removeEventListener(listener) }
     }
 
     Scaffold(
@@ -182,7 +191,34 @@ fun TasksScreen(onNavigateBack: () -> Unit) {
                     color = Color.Black
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF8E1))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "🍓", fontSize = 26.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Как получить малинки?",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = "Отвечай правильно хотя бы на половину вопросов — и получишь 75 малинок за тест! 🎁 А пройдёшь без единой ошибки — тебя ждут достижения и ещё больше призов! 🌟",
+                                fontSize = 13.sp,
+                                lineHeight = 19.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 quizItems.forEachIndexed { index, item ->
                     QuizButton(

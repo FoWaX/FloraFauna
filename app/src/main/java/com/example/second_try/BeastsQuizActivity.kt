@@ -149,6 +149,10 @@ fun BeastsQuizScreen(
         if (quizPart == 1) "perfect_beasts_quiz_1" else "perfect_beasts_quiz_2"
     }
 
+    val halfRewardedKey = remember(quizPart) {
+        if (quizPart == 1) "beasts_quiz_1_half_rewarded" else "beasts_quiz_2_half_rewarded"
+    }
+
     var currentGroupIndex by remember { mutableStateOf(0) }
 
     val selectedAnswers: SnapshotStateMap<String, Int> = remember {
@@ -161,6 +165,7 @@ fun BeastsQuizScreen(
 
     var showFinalDialog by remember { mutableStateOf(false) }
     var isFinished by remember { mutableStateOf(false) }
+    var halfRewarded by remember { mutableStateOf(false) }
 
     val totalQuestions = groups.sumOf { it.questions.size }
 
@@ -182,6 +187,20 @@ fun BeastsQuizScreen(
 
             if (correctAnswersCount == totalQuestions) {
                 dbRef.child(perfectKey).setValue(true)
+            }
+
+            if (correctAnswersCount * 2 >= totalQuestions) {
+                dbRef.child(halfRewardedKey).get().addOnSuccessListener { snap ->
+                    if (snap.getValue(Boolean::class.java) != true) {
+                        halfRewarded = true
+                        dbRef.child(halfRewardedKey).setValue(true)
+                        val conesRef = dbRef.parent!!.child("cones")
+                        conesRef.get().addOnSuccessListener { conesSnap ->
+                            val cur = conesSnap.getValue(Int::class.java) ?: 0
+                            conesRef.setValue(cur + 75)
+                        }
+                    }
+                }
             }
         }
 
@@ -223,6 +242,16 @@ fun BeastsQuizScreen(
                 Spacer(Modifier.height(12.dp))
 
                 Text("Правильных ответов: $correctAnswersCount из $totalQuestions")
+
+                if (halfRewarded) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "🍓 +75 малинок за прохождение теста!",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF2E7D32)
+                    )
+                }
 
                 Spacer(Modifier.height(24.dp))
 

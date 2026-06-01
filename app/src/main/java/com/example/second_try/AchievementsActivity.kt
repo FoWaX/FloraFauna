@@ -33,7 +33,9 @@ data class Achievement(
     val id: String,
     val title: String,
     val iconRes: Int,
-    val unlocked: Boolean
+    val unlocked: Boolean,
+    val reward: Int = 0,
+    val description: String = ""
 )
 
 class AchievementsActivity : ComponentActivity() {
@@ -58,13 +60,21 @@ fun AchievementsScreen(onNavigateBack: () -> Unit) {
         ).getReference("Users").child(it.uid)
     }
 
-    // состояния (Firebase-driven)
-    var perfectQuiz1 by remember { mutableStateOf(false) }
-    var perfectQuiz2 by remember { mutableStateOf(false) }
-    var perfectQuiz3 by remember { mutableStateOf(false) }
+    // состояния (Firebase-driven) — по каждой викторине
+    var perfectPhotoRiddles by remember { mutableStateOf(false) }
+    var perfectAmphibianSigns by remember { mutableStateOf(false) }
+    var perfectReptileSigns by remember { mutableStateOf(false) }
+    var perfectWhoIsWho by remember { mutableStateOf(false) }
+    var perfectAmphibianNames by remember { mutableStateOf(false) }
+    var perfectReptileNames by remember { mutableStateOf(false) }
+    var perfectDangerousOrNot by remember { mutableStateOf(false) }
+    var perfectBeastsQuiz1 by remember { mutableStateOf(false) }
+    var perfectBeastsQuiz2 by remember { mutableStateOf(false) }
+    var perfectBirdsQuiz1 by remember { mutableStateOf(false) }
+    var perfectBirdsQuiz2 by remember { mutableStateOf(false) }
     var perfectAllQuizzes by remember { mutableStateOf(false) }
 
-    var quiz1Done by remember { mutableStateOf(false) }
+    var anyQuizDone by remember { mutableStateOf(false) }
     var allQuizzesDone by remember { mutableStateOf(false) }
     var masterPhotoUnlocked by remember { mutableStateOf(false) }
     var photosSaved by remember { mutableStateOf(0) }
@@ -98,19 +108,38 @@ fun AchievementsScreen(onNavigateBack: () -> Unit) {
             })
     }
 
-    // 1. читаем прогресс викторин и photosSaved из Firebase
+    // читаем прогресс викторин и photosSaved из Firebase
     LaunchedEffect(Unit) {
         dbRef?.child("quiz_progress")?.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                quiz1Done = snapshot.child("quiz1_done").getValue(Boolean::class.java) ?: false
-                allQuizzesDone = snapshot.child("all_quizzes_done").getValue(Boolean::class.java) ?: false
+                fun bool(key: String) = snapshot.child(key).getValue(Boolean::class.java) ?: false
 
-                perfectQuiz1 = snapshot.child("perfect_quiz1").getValue(Boolean::class.java) ?: false
-                perfectQuiz2 = snapshot.child("perfect_quiz2").getValue(Boolean::class.java) ?: false
-                perfectQuiz3 = snapshot.child("perfect_quiz3").getValue(Boolean::class.java) ?: false
+                perfectPhotoRiddles = bool("perfect_photo_riddles")
+                perfectAmphibianSigns = bool("perfect_amphibian_signs")
+                perfectReptileSigns = bool("perfect_reptile_signs")
+                perfectWhoIsWho = bool("perfect_who_is_who")
+                perfectAmphibianNames = bool("perfect_amphibian_names")
+                perfectReptileNames = bool("perfect_reptile_names")
+                perfectDangerousOrNot = bool("perfect_dangerous_or_not")
+                perfectBeastsQuiz1 = bool("perfect_beasts_quiz_1")
+                perfectBeastsQuiz2 = bool("perfect_beasts_quiz_2")
+                perfectBirdsQuiz1 = bool("perfect_birds_quiz_1")
+                perfectBirdsQuiz2 = bool("perfect_birds_quiz_2")
 
-                // Все идеальные?
-                perfectAllQuizzes = perfectQuiz1 && perfectQuiz2 && perfectQuiz3
+                perfectAllQuizzes = perfectPhotoRiddles && perfectAmphibianSigns &&
+                    perfectReptileSigns && perfectWhoIsWho && perfectAmphibianNames &&
+                    perfectReptileNames && perfectDangerousOrNot &&
+                    perfectBeastsQuiz1 && perfectBeastsQuiz2 &&
+                    perfectBirdsQuiz1 && perfectBirdsQuiz2
+
+                val doneKeys = listOf(
+                    "photo_riddles_done", "amphibian_signs_done", "reptile_signs_done",
+                    "who_is_who_done", "amphibian_names_done", "reptile_names_done",
+                    "dangerous_or_not_done", "beasts_quiz_1_done", "beasts_quiz_2_done",
+                    "birds_quiz_1_done", "birds_quiz_2_done"
+                )
+                anyQuizDone = doneKeys.any { bool(it) }
+                allQuizzesDone = bool("all_quizzes_done")
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -122,34 +151,58 @@ fun AchievementsScreen(onNavigateBack: () -> Unit) {
         })
     }
 
-    // Константы — количество карточек в каждом разделе (должны соответствовать ExploreActivity)
     val REPTILES_TOTAL = 14
     val AMPHIBIANS_TOTAL = 12
-
-    // Вычисляем сколько карточек каждого типа просмотрено (viewedSet хранит id типа "presX" / "zemY")
     val reptileCount = viewedSet.count { it.startsWith("pres") }
     val amphibianCount = viewedSet.count { it.startsWith("zem") }
-    val totalViewedCount = reptileCount + amphibianCount
-
     val zoologistUnlocked = amphibianCount >= AMPHIBIANS_TOTAL
     val herpetologistUnlocked = reptileCount >= REPTILES_TOTAL
-    val allCardsUnlocked = totalViewedCount >= (REPTILES_TOTAL + AMPHIBIANS_TOTAL)
 
-    // список достижений — добавлены новые три достижения
+    // список достижений
     val achievements = listOf(
-        Achievement("perfect_quiz1", "Безошибочный! Кто есть кто?", R.drawable.ic_medal, perfectQuiz1),
-        Achievement("perfect_quiz2", "Безошибочный! Земноводные", R.drawable.ic_medal, perfectQuiz2),
-        Achievement("perfect_quiz3", "Безошибочный! Пресмыкающиеся", R.drawable.ic_medal, perfectQuiz3),
-        Achievement("perfect_all_quizzes", "Абсолютно безошибочный!", R.drawable.ic_trophey, perfectAllQuizzes),
-
-        Achievement("quiz1_done", "Первый шаг", R.drawable.ic_medal, quiz1Done),
-        Achievement("all_quizzes_done", "Все викторины", R.drawable.ic_trophey, allQuizzesDone),
-        Achievement("first_photo", "Первое фото", R.drawable.camera, photosSaved >= 1),
-        Achievement("photos", "Фотограф природы", R.drawable.camera, photosSaved >= 5),
-        Achievement("master_photo", "Мастер кадра", R.drawable.ic_trophey, masterPhotoUnlocked),
-        Achievement("zoologist", "Зоолог-любитель", R.drawable.ic_medal, zoologistUnlocked),
-        Achievement("herpetologist", "Герпетолог", R.drawable.ic_trophey, herpetologistUnlocked),
-        Achievement("all_cards", "Просмотрел всё", R.drawable.ic_trophey, allCardsUnlocked)
+        // ── Безошибочные — по каждой из 11 викторин ──
+        Achievement("perfect_photo_riddles", "Безошибочный! Фотозагадки", R.drawable.ic_medal, perfectPhotoRiddles, 120,
+            "Ты разгадал все фотозагадки без единой ошибки — глаз-алмаз! 📸"),
+        Achievement("perfect_amphibian_signs", "Безошибочный! Признаки земноводных", R.drawable.ic_medal, perfectAmphibianSigns, 120,
+            "Ты знаешь все признаки земноводных назубок — никаких ошибок! 🐸"),
+        Achievement("perfect_reptile_signs", "Безошибочный! Признаки пресмыкающихся", R.drawable.ic_medal, perfectReptileSigns, 120,
+            "Ни одной ошибки в признаках рептилий — настоящий эксперт! 🦎"),
+        Achievement("perfect_who_is_who", "Безошибочный! Кто есть кто?", R.drawable.ic_medal, perfectWhoIsWho, 120,
+            "Ты мгновенно отличаешь земноводных от рептилий — безупречно! 🌟"),
+        Achievement("perfect_amphibian_names", "Безошибочный! Названия земноводных", R.drawable.ic_medal, perfectAmphibianNames, 120,
+            "Все названия земноводных — без единой ошибки! Фантастика! 🐊"),
+        Achievement("perfect_reptile_names", "Безошибочный! Названия пресмыкающихся", R.drawable.ic_medal, perfectReptileNames, 120,
+            "Все названия пресмыкающихся на отлично — это впечатляет! 🐍"),
+        Achievement("perfect_dangerous_or_not", "Безошибочный! Опасные и безобидные", R.drawable.ic_medal, perfectDangerousOrNot, 120,
+            "Ты точно знаешь кто опасен, а кто нет — ни разу не ошибся! ⚡"),
+        Achievement("perfect_beasts_quiz_1", "Безошибочный! Звери 1", R.drawable.ic_medal, perfectBeastsQuiz1, 120,
+            "Первая часть про зверей — без единой ошибки! Вот это зверюга! 🐺"),
+        Achievement("perfect_beasts_quiz_2", "Безошибочный! Звери 2", R.drawable.ic_medal, perfectBeastsQuiz2, 120,
+            "Вторая часть про зверей — снова без ошибок! Невероятно! 🦁"),
+        Achievement("perfect_birds_quiz_1", "Безошибочный! Птицы 1", R.drawable.ic_medal, perfectBirdsQuiz1, 120,
+            "Первая часть про птиц — идеально! Ты просто орёл! 🦅"),
+        Achievement("perfect_birds_quiz_2", "Безошибочный! Птицы 2", R.drawable.ic_medal, perfectBirdsQuiz2, 120,
+            "Вторая часть про птиц — снова без ошибок! Вот это полёт мысли! 🦜"),
+        // ── Главный приз ──
+        Achievement("perfect_all_quizzes", "Абсолютно безошибочный!", R.drawable.ic_trophey, perfectAllQuizzes, 500,
+            "Все 11 викторин на 100%! Ты настоящая легенда знаний о животных! 🏆"),
+        // ── Прогресс ──
+        Achievement("quiz_first_done", "Первый шаг", R.drawable.ic_medal, anyQuizDone, 50,
+            "Ты прошёл свою первую викторину — это начало большого пути! 🌟"),
+        Achievement("all_quizzes_done", "Все викторины пройдены!", R.drawable.ic_trophey, allQuizzesDone, 100,
+            "Ты прошёл все 11 викторин! Это настоящий подвиг! 🎉"),
+        // ── Фото ──
+        Achievement("first_photo", "Первое фото", R.drawable.camera, photosSaved >= 1, 30,
+            "Ты сохранил своё первое фото в галерею. Начало положено! 📸"),
+        Achievement("photos", "Фотограф природы", R.drawable.camera, photosSaved >= 5, 150,
+            "Целых 5 фотографий в галерее! Ты настоящий фотограф природы! 📷"),
+        Achievement("master_photo", "Мастер кадра", R.drawable.ic_trophey, masterPhotoUnlocked, 50,
+            "Ты так часто заглядывал в галерею! Настоящий мастер кадра! 🎨"),
+        // ── Карточки ──
+        Achievement("zoologist", "Зоолог-любитель", R.drawable.ic_medal, zoologistUnlocked, 50,
+            "Ты прочитал все карточки о земноводных — теперь ты настоящий зоолог-любитель! 🐊"),
+        Achievement("herpetologist", "Герпетолог", R.drawable.ic_trophey, herpetologistUnlocked, 50,
+            "Ты прочитал все карточки о пресмыкающихся. Ты достойный герпетолог! 🦖")
     )
 
     // 2. сохраняем достижения и выдаём шишки (логика похожа на уже существующую)
@@ -164,22 +217,7 @@ fun AchievementsScreen(onNavigateBack: () -> Unit) {
                 rewardedRef?.get()?.addOnSuccessListener { snapshot ->
                     val alreadyRewarded = snapshot.getValue(Boolean::class.java) ?: false
                     if (!alreadyRewarded) {
-                        // начисляем награду
-                        val reward = when (achievement.id) {
-                            "quiz1_done" -> 50
-                            "all_quizzes_done" -> 100
-                            "photos" -> 150
-                            "zoologist" -> 50    // Зоолог-любитель
-                            "herpetologist" -> 50 // Герпетолог
-                            "all_cards" -> 150   // Просмотрел всё
-                            "first_photo" -> 30
-                            "master_photo" -> 50
-                            "perfect_quiz1" -> 120
-                            "perfect_quiz2" -> 120
-                            "perfect_quiz3" -> 120
-                            "perfect_all_quizzes" -> 200
-                            else -> 0
-                        }
+                        val reward = achievement.reward
                         val conesRef = dbRef.child("cones")
                         conesRef.get().addOnSuccessListener { conesSnap ->
                             val currentCones = conesSnap.getValue(Int::class.java) ?: 0
@@ -221,6 +259,26 @@ fun AchievementsScreen(onNavigateBack: () -> Unit) {
                     .padding(vertical = 12.dp),
                 color = Color(0xFF6200EE)
             )
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF8E1))
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "🔒", fontSize = 28.sp)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "Некоторые достижения пока скрыты — это сюрпризы! 🎁\nИсследуй приложение, проходи викторины, читай карточки — и они будут открываться одно за другим. Нажми на открытое достижение, чтобы узнать о нём больше!",
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp
+                    )
+                }
+            }
 
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
@@ -283,7 +341,14 @@ fun AchievementItem(achievement: Achievement) {
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text(achievement.title) },
+            title = {
+                Text(
+                    text = achievement.title,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
             text = {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -297,30 +362,41 @@ fun AchievementItem(achievement: Achievement) {
                             .padding(8.dp)
                     )
                     Text(
-                        text = when (achievement.id) {
-                            "quiz1_done" -> "Получено за прохождение первой викторины."
-                            "all_quizzes_done" -> "Получено за прохождение всех викторин."
-                            "photos" -> "Получено за сохранение 5 фотографий."
-                            "zoologist" -> "Получено за просмотр всех карточек раздела \"Земноводные\"."
-                            "herpetologist" -> "Получено за просмотр всех карточек раздела \"Пресмыкающиеся\"."
-                            "all_cards" -> "Получено за просмотр всех карточек приложения."
-                            "first_photo" -> "Получено за сохранение первой фотографии."
-                            "master_photo" -> "Получено за частые посещения галереи (10 раз)."
-                            "perfect_quiz1" -> "Пройди викторину «Кто есть кто?» без единой ошибки."
-                            "perfect_quiz2" -> "Пройди викторину «Земноводные» идеально!"
-                            "perfect_quiz3" -> "Пройди викторину «Пресмыкающиеся» без ошибок."
-                            "perfect_all_quizzes" -> "Абсолютно безошибочный! Пройди все викторины на 100%."
-                            else -> ""
-                        },
+                        text = achievement.description,
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center,
+                        lineHeight = 20.sp,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "Награда: ",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "${achievement.reward} малинок",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF2E7D32)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(text = "🍓", fontSize = 16.sp)
+                        }
+                    }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { showDialog = false }) {
-                    Text("Закрыть")
+                    Text("Ура, понятно!")
                 }
             }
         )

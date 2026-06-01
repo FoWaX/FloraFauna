@@ -60,6 +60,7 @@ data class ImageQuizDefinition(
     val title: String,
     val doneKey: String,
     val perfectKey: String,
+    val halfRewardedKey: String,
     val questions: List<ImageQuizQuestion>
 )
 
@@ -79,13 +80,14 @@ fun ImageQuizScreen(
         "https://mental-health-72105-default-rtdb.europe-west1.firebasedatabase.app"
     ).getReference("Users").child(user.uid).child("quiz_progress")
 
-    val quiz = remember(quizId) { getImageQuizById(quizId) }
+    val quiz = remember(quizId) { getImageQuizById(context, quizId) }
 
     var currentQuestionIndex by remember { mutableStateOf(0) }
     var correctCount by remember { mutableStateOf(0) }
     var selectedAnswerIndex by remember { mutableStateOf<Int?>(null) }
     var showAnswer by remember { mutableStateOf(false) }
     var isFinished by remember { mutableStateOf(false) }
+    var halfRewarded by remember { mutableStateOf(false) }
 
     // ВАЖНО: варианты одного вопроса перемешиваем и запоминаем до перехода к следующему
     var shuffledAnswers by remember(currentQuestionIndex, quiz.id) {
@@ -205,6 +207,20 @@ fun ImageQuizScreen(
                     if (correctCount == quiz.questions.size) {
                         dbRef.child(quiz.perfectKey).setValue(true)
                     }
+
+                    if (correctCount * 2 >= quiz.questions.size) {
+                        dbRef.child(quiz.halfRewardedKey).get().addOnSuccessListener { snap ->
+                            if (snap.getValue(Boolean::class.java) != true) {
+                                halfRewarded = true
+                                dbRef.child(quiz.halfRewardedKey).setValue(true)
+                                val conesRef = dbRef.parent!!.child("cones")
+                                conesRef.get().addOnSuccessListener { conesSnap ->
+                                    val cur = conesSnap.getValue(Int::class.java) ?: 0
+                                    conesRef.setValue(cur + 75)
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Column(
@@ -214,6 +230,15 @@ fun ImageQuizScreen(
                     Text("Тест завершён!", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(12.dp))
                     Text("Правильных ответов: $correctCount из ${quiz.questions.size}")
+                    if (halfRewarded) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "🍓 +75 малинок за прохождение теста!",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF2E7D32)
+                        )
+                    }
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Button(onClick = {
@@ -237,341 +262,119 @@ fun ImageQuizScreen(
 
 // ----------------------- ДАННЫЕ ВИКТОРИН -----------------------
 
-private fun getImageQuizById(id: String): ImageQuizDefinition {
-    val all = listOf(
-        quizAmphibianSigns(),
-        quizReptileSigns(),
-        quizWhoIsWho(),
-        quizAmphibianNames(),
-        quizReptileNames(),
-        quizDangerousOrNot()
-    )
-    return all.firstOrNull { it.id == id } ?: all.first()
+private data class ImageQuizRaw(
+    val id: String,
+    val title: String,
+    val doneKey: String,
+    val perfectKey: String,
+    val halfRewardedKey: String,
+    val questions: List<ImageQuizQuestionRaw>
+)
+
+private data class ImageQuizQuestionRaw(
+    val text: String,
+    val answers: List<ImageQuizAnswerRaw>
+)
+
+private data class ImageQuizAnswerRaw(
+    val imageResName: String,
+    val isCorrect: Boolean
+)
+
+private fun parseImageQuizzes(context: android.content.Context): List<ImageQuizRaw> {
+    val text = context.resources.openRawResource(R.raw.quiz_image)
+        .bufferedReader(Charsets.UTF_8)
+        .use { it.readText() }
+
+    val headerRegex = Regex("""^===\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*===$""")
+    val quizzes = mutableListOf<ImageQuizRaw>()
+
+    var currentId: String? = null
+    var currentTitle: String? = null
+    var currentDoneKey: String? = null
+    var currentPerfectKey: String? = null
+    var currentHalfKey: String? = null
+    var currentQuestions = mutableListOf<ImageQuizQuestionRaw>()
+    var currentQuestionText: String? = null
+    var currentAnswers = mutableListOf<ImageQuizAnswerRaw>()
+
+    fun flushQuestion() {
+        val qt = currentQuestionText ?: return
+        if (currentAnswers.isNotEmpty()) {
+            currentQuestions.add(ImageQuizQuestionRaw(qt, currentAnswers.toList()))
+        }
+        currentQuestionText = null
+        currentAnswers = mutableListOf()
+    }
+
+    fun flushQuiz() {
+        flushQuestion()
+        val id = currentId ?: return
+        if (currentQuestions.isNotEmpty()) {
+            quizzes.add(ImageQuizRaw(
+                id, currentTitle!!, currentDoneKey!!, currentPerfectKey!!, currentHalfKey!!,
+                currentQuestions.toList()
+            ))
+        }
+        currentId = null; currentTitle = null; currentDoneKey = null
+        currentPerfectKey = null; currentHalfKey = null
+        currentQuestions = mutableListOf()
+    }
+
+    for (rawLine in text.lines()) {
+        val line = rawLine.trim()
+        if (line.isBlank()) continue
+
+        val headerMatch = headerRegex.find(line)
+        if (headerMatch != null) {
+            flushQuiz()
+            currentId = headerMatch.groupValues[1].trim()
+            currentTitle = headerMatch.groupValues[2].trim()
+            currentDoneKey = headerMatch.groupValues[3].trim()
+            currentPerfectKey = headerMatch.groupValues[4].trim()
+            currentHalfKey = headerMatch.groupValues[5].trim()
+            continue
+        }
+
+        if (line.startsWith("? ")) {
+            flushQuestion()
+            currentQuestionText = line.removePrefix("? ").trim()
+            continue
+        }
+
+        if (line.startsWith("+ ") || line.startsWith("- ")) {
+            val isCorrect = line.startsWith("+ ")
+            currentAnswers.add(ImageQuizAnswerRaw(line.drop(2).trim(), isCorrect))
+            continue
+        }
+    }
+    flushQuiz()
+    return quizzes
 }
 
-private fun quizAmphibianSigns() = ImageQuizDefinition(
-    id = "amphibian_signs",
-    title = "Признаки земноводных",
-    doneKey = "amphibian_signs_done",
-    perfectKey = "perfect_amphibian_signs",
-    questions = listOf(
-        ImageQuizQuestion("Какое второе название земноводных?", listOf(
-            ImageQuizAnswer(R.drawable.ph_0019_2, true),
-            ImageQuizAnswer(R.drawable.ph_0019_3, false)
-        )),
-        ImageQuizQuestion("У земноводных голая влажная кожа", listOf(
-            ImageQuizAnswer(R.drawable.ph_0003_3, true),
-            ImageQuizAnswer(R.drawable.ph_0016_4, false),
-            ImageQuizAnswer(R.drawable.ph_0011_3, false)
-        )),
-        ImageQuizQuestion("Выпуклые глаза с веками", listOf(
-            ImageQuizAnswer(R.drawable.ph_0003_5, true),
-            ImageQuizAnswer(R.drawable.ph_0018_4, false),
-            ImageQuizAnswer(R.drawable.ph_0012_2, false)
-        )),
-        ImageQuizQuestion("На задних лапах перепонки", listOf(
-            ImageQuizAnswer(R.drawable.ph_0003_4, true),
-            ImageQuizAnswer(R.drawable.ph_0019_1, false),
-            ImageQuizAnswer(R.drawable.ph_0015_2, false)
-        )),
-        ImageQuizQuestion("На пальцах нет когтей", listOf(
-            ImageQuizAnswer(R.drawable.ph_0019_1, true),
-            ImageQuizAnswer(R.drawable.ph_0016_4, false),
-            ImageQuizAnswer(R.drawable.ph_0014_1, false)
-        )),
-        ImageQuizQuestion("У большинства амфибий нет хвоста", listOf(
-            ImageQuizAnswer(R.drawable.ph_0003_2, true),
-            ImageQuizAnswer(R.drawable.ph_0005_1, false),
-            ImageQuizAnswer(R.drawable.ph_0016_2, false)
-        )),
-        ImageQuizQuestion("Тритон – земноводное (тоже голая кожа)", listOf(
-            ImageQuizAnswer(R.drawable.ph_0005_3, true),
-            ImageQuizAnswer(R.drawable.ph_0015_1, false),
-            ImageQuizAnswer(R.drawable.ph_0017_2, false)
-        )),
-        ImageQuizQuestion("У самцов лягушек резонаторы, чтобы громко квакать", listOf(
-            ImageQuizAnswer(R.drawable.ph_0018_1, true),
-            ImageQuizAnswer(R.drawable.ph_0007_4, false),
-            ImageQuizAnswer(R.drawable.ph_0018_4, false)
-        )),
-        ImageQuizQuestion("Круглое слуховое отверстие закрыто", listOf(
-            ImageQuizAnswer(R.drawable.ph_0018_2, true),
-            ImageQuizAnswer(R.drawable.ph_0018_5, false)
-        ))
-    )
-)
+private fun getImageQuizById(context: android.content.Context, id: String): ImageQuizDefinition {
+    val raw = parseImageQuizzes(context)
+    return raw.firstOrNull { it.id == id }?.let { rawQuiz ->
+        ImageQuizDefinition(
+            id = rawQuiz.id,
+            title = rawQuiz.title,
+            doneKey = rawQuiz.doneKey,
+            perfectKey = rawQuiz.perfectKey,
+            halfRewardedKey = rawQuiz.halfRewardedKey,
+            questions = rawQuiz.questions.map { rawQ ->
+                ImageQuizQuestion(
+                    text = rawQ.text,
+                    answers = rawQ.answers.map { rawA ->
+                        ImageQuizAnswer(
+                            imageRes = context.resources.getIdentifier(
+                                rawA.imageResName, "drawable", context.packageName
+                            ),
+                            isCorrect = rawA.isCorrect
+                        )
+                    }
+                )
+            }
+        )
+    } ?: ImageQuizDefinition("", "", "", "", "", emptyList())
+}
 
-private fun quizReptileSigns() = ImageQuizDefinition(
-    id = "reptile_signs",
-    title = "Признаки пресмыкающихся",
-    doneKey = "reptile_signs_done",
-    perfectKey = "perfect_reptile_signs",
-    questions = listOf(
-        ImageQuizQuestion("Как еще называют пресмыкающихся?", listOf(
-            ImageQuizAnswer(R.drawable.ph_0019_3, true),
-            ImageQuizAnswer(R.drawable.ph_0019_2, false)
-        )),
-        ImageQuizQuestion("Кожа рептилий покрыта роговыми чешуями", listOf(
-            ImageQuizAnswer(R.drawable.ph_0018_6, true),
-            ImageQuizAnswer(R.drawable.ph_0018_9, false),
-            ImageQuizAnswer(R.drawable.ph_0004_2, false)
-        )),
-        ImageQuizQuestion("У ящериц подвижные веки", listOf(
-            ImageQuizAnswer(R.drawable.ph_0018_4, true),
-            ImageQuizAnswer(R.drawable.ph_0018_3, false),
-            ImageQuizAnswer(R.drawable.ph_0003_5, false)
-        )),
-        ImageQuizQuestion("У змей немигающие глаза", listOf(
-            ImageQuizAnswer(R.drawable.ph_0018_3, true),
-            ImageQuizAnswer(R.drawable.ph_0018_5, false),
-            ImageQuizAnswer(R.drawable.ph_0016_4, false)
-        )),
-        ImageQuizQuestion("На пальцах когти", listOf(
-            ImageQuizAnswer(R.drawable.ph_0016_4, true),
-            ImageQuizAnswer(R.drawable.ph_0019_1, false),
-            ImageQuizAnswer(R.drawable.ph_0003_4, false)
-        )),
-        ImageQuizQuestion("У всех рептилий есть хвост", listOf(
-            ImageQuizAnswer(R.drawable.ph_0016_2, true),
-            ImageQuizAnswer(R.drawable.ph_0005_2, false)
-        )),
-        ImageQuizQuestion("Панцирь только у черепах", listOf(
-            ImageQuizAnswer(R.drawable.ph_0014_2, true),
-            ImageQuizAnswer(R.drawable.ph_0006_2, false),
-            ImageQuizAnswer(R.drawable.ph_0017_3, false)
-        )),
-        ImageQuizQuestion("Слуховое отверстие открыто", listOf(
-            ImageQuizAnswer(R.drawable.ph_0018_5, true),
-            ImageQuizAnswer(R.drawable.ph_0018_2, false)
-        )),
-        ImageQuizQuestion("У рептилий нет резонаторов", listOf(
-            ImageQuizAnswer(R.drawable.ph_0012_2, true),
-            ImageQuizAnswer(R.drawable.ph_0018_1, false)
-        ))
-    )
-)
-
-private fun quizWhoIsWho() = ImageQuizDefinition(
-    id = "who_is_who",
-    title = "Кто есть кто?",
-    doneKey = "who_is_who_done",
-    perfectKey = "perfect_who_is_who",
-    questions = listOf(
-        ImageQuizQuestion("Найди земноводное", listOf(
-            ImageQuizAnswer(R.drawable.ph_0005_1, true),
-            ImageQuizAnswer(R.drawable.ph_0017_1, false),
-            ImageQuizAnswer(R.drawable.ph_0015_2, false)
-        )),
-        ImageQuizQuestion("Кто из них рептилия?", listOf(
-            ImageQuizAnswer(R.drawable.ph_0016_3, true),
-            ImageQuizAnswer(R.drawable.ph_0005_3, false),
-            ImageQuizAnswer(R.drawable.ph_0005_1, false)
-        )),
-        ImageQuizQuestion("Точно узнаешь пресмыкающееся", listOf(
-            ImageQuizAnswer(R.drawable.ph_0014_1, true),
-            ImageQuizAnswer(R.drawable.ph_0003_1, false),
-            ImageQuizAnswer(R.drawable.ph_0001_2, false)
-        )),
-        ImageQuizQuestion("Из них одна – ящерица, а не змея", listOf(
-            ImageQuizAnswer(R.drawable.ph_0007_3, true),
-            ImageQuizAnswer(R.drawable.ph_0013_1, false),
-            ImageQuizAnswer(R.drawable.ph_0008_1, false)
-        )),
-        ImageQuizQuestion("Где голова земноводного?", listOf(
-            ImageQuizAnswer(R.drawable.ph_0003_5, true),
-            ImageQuizAnswer(R.drawable.ph_0018_3, false),
-            ImageQuizAnswer(R.drawable.ph_0012_2, false)
-        )),
-        ImageQuizQuestion("Кто амфибия?", listOf(
-            ImageQuizAnswer(R.drawable.ph_0005_2, true),
-            ImageQuizAnswer(R.drawable.ph_0012_1, false),
-            ImageQuizAnswer(R.drawable.ph_0018_6, false)
-        )),
-        ImageQuizQuestion("Легко узнать амфибию", listOf(
-            ImageQuizAnswer(R.drawable.ph_0018_9, true),
-            ImageQuizAnswer(R.drawable.ph_0007_4, false),
-            ImageQuizAnswer(R.drawable.ph_0016_4, false)
-        )),
-        ImageQuizQuestion("Кто пресмыкающееся?", listOf(
-            ImageQuizAnswer(R.drawable.ph_0017_2, true),
-            ImageQuizAnswer(R.drawable.ph_0005_1, false),
-            ImageQuizAnswer(R.drawable.ph_0002_2, false)
-        )),
-        ImageQuizQuestion("Где лапа рептилии?", listOf(
-            ImageQuizAnswer(R.drawable.ph_0016_4, true),
-            ImageQuizAnswer(R.drawable.ph_0019_1, false),
-            ImageQuizAnswer(R.drawable.ph_0003_4, false)
-        ))
-    )
-)
-
-private fun quizAmphibianNames() = ImageQuizDefinition(
-    id = "amphibian_names",
-    title = "Тренажер названий земноводных",
-    doneKey = "amphibian_names_done",
-    perfectKey = "perfect_amphibian_names",
-    questions = listOf(
-        ImageQuizQuestion("Жаба зеленая (выпуклые заушные железы)", listOf(
-            ImageQuizAnswer(R.drawable.ph_0001_1, true),
-            ImageQuizAnswer(R.drawable.ph_0018_5, false),
-            ImageQuizAnswer(R.drawable.ph_0003_2, false)
-        )),
-        ImageQuizQuestion("Лягушка озерная (самая большая в Саратовской области)", listOf(
-            ImageQuizAnswer(R.drawable.ph_0018_7, true),
-            ImageQuizAnswer(R.drawable.ph_0006_2, false)
-        )),
-        ImageQuizQuestion("Лягушка остромордая", listOf(
-            ImageQuizAnswer(R.drawable.ph_0004_2, true),
-            ImageQuizAnswer(R.drawable.ph_0001_2, false),
-            ImageQuizAnswer(R.drawable.ph_0018_9, false)
-        )),
-        ImageQuizQuestion("У чесночницы обыкновенной красные крапинки", listOf(
-            ImageQuizAnswer(R.drawable.ph_0006_1, true),
-            ImageQuizAnswer(R.drawable.ph_0002_2, false),
-            ImageQuizAnswer(R.drawable.ph_0004_1, false)
-        )),
-        ImageQuizQuestion("Жерлянка краснобрюхая", listOf(
-            ImageQuizAnswer(R.drawable.ph_0018_8, true),
-            ImageQuizAnswer(R.drawable.ph_0003_3, false),
-            ImageQuizAnswer(R.drawable.ph_0001_1, false)
-        )),
-        ImageQuizQuestion("Тритон обыкновенный", listOf(
-            ImageQuizAnswer(R.drawable.ph_0005_2, true),
-            ImageQuizAnswer(R.drawable.ph_0015_2, false),
-            ImageQuizAnswer(R.drawable.ph_0015_1, false)
-        ))
-    )
-)
-
-private fun quizReptileNames() = ImageQuizDefinition(
-    id = "reptile_names",
-    title = "Тренажер названий пресмыкающихся",
-    doneKey = "reptile_names_done",
-    perfectKey = "perfect_reptile_names",
-    questions = listOf(
-        ImageQuizQuestion("Веретеница ломкая (безногая ящерица)", listOf(
-            ImageQuizAnswer(R.drawable.ph_0007_2, true),
-            ImageQuizAnswer(R.drawable.ph_0016_1, false),
-            ImageQuizAnswer(R.drawable.ph_0009_1, false)
-        )),
-        ImageQuizQuestion("Гадюка Никольского (вся черная)", listOf(
-            ImageQuizAnswer(R.drawable.ph_0008_4, true),
-            ImageQuizAnswer(R.drawable.ph_0013_2, false),
-            ImageQuizAnswer(R.drawable.ph_0013_1, false)
-        )),
-        ImageQuizQuestion("Гадюка степная (темный зигзаг на спине)", listOf(
-            ImageQuizAnswer(R.drawable.ph_0009_2, true),
-            ImageQuizAnswer(R.drawable.ph_0012_1, false),
-            ImageQuizAnswer(R.drawable.ph_0008_3, false)
-        )),
-        ImageQuizQuestion("Медянка обыкновенная (медный цвет на брюхе)", listOf(
-            ImageQuizAnswer(R.drawable.ph_0010_1, true),
-            ImageQuizAnswer(R.drawable.ph_0015_2, false),
-            ImageQuizAnswer(R.drawable.ph_0017_1, false)
-        )),
-        ImageQuizQuestion("Полоз узорчатый", listOf(
-            ImageQuizAnswer(R.drawable.ph_0011_1, true),
-            ImageQuizAnswer(R.drawable.ph_0009_1, false),
-            ImageQuizAnswer(R.drawable.ph_0007_1, false)
-        )),
-        ImageQuizQuestion("Уж водяной", listOf(
-            ImageQuizAnswer(R.drawable.ph_0012_1, true),
-            ImageQuizAnswer(R.drawable.ph_0013_1, false),
-            ImageQuizAnswer(R.drawable.ph_0018_3, false)
-        )),
-        ImageQuizQuestion("Уж обыкновенный", listOf(
-            ImageQuizAnswer(R.drawable.ph_0013_2, true),
-            ImageQuizAnswer(R.drawable.ph_0008_1, false),
-            ImageQuizAnswer(R.drawable.ph_0008_3, false)
-        )),
-        ImageQuizQuestion("Черепаха болотная", listOf(
-            ImageQuizAnswer(R.drawable.ph_0014_1, true),
-            ImageQuizAnswer(R.drawable.ph_0018_3, false),
-            ImageQuizAnswer(R.drawable.ph_0012_2, false)
-        )),
-        ImageQuizQuestion("Ящерица прыткая (самец)", listOf(
-            ImageQuizAnswer(R.drawable.ph_0016_1, true),
-            ImageQuizAnswer(R.drawable.ph_0016_3, false),
-            ImageQuizAnswer(R.drawable.ph_0017_2, false)
-        )),
-        ImageQuizQuestion("Ящерица прыткая (самка)", listOf(
-            ImageQuizAnswer(R.drawable.ph_0016_3, true),
-            ImageQuizAnswer(R.drawable.ph_0016_2, false),
-            ImageQuizAnswer(R.drawable.ph_0017_3, false)
-        )),
-        ImageQuizQuestion("Ящерица живородящая (Красная книга)", listOf(
-            ImageQuizAnswer(R.drawable.ph_0015_2, true),
-            ImageQuizAnswer(R.drawable.ph_0016_1, false)
-        )),
-        ImageQuizQuestion("Ящурка разноцветная", listOf(
-            ImageQuizAnswer(R.drawable.ph_0017_1, true),
-            ImageQuizAnswer(R.drawable.ph_0015_1, false),
-            ImageQuizAnswer(R.drawable.ph_0016_2, false)
-        ))
-    )
-)
-
-private fun quizDangerousOrNot() = ImageQuizDefinition(
-    id = "dangerous_or_not",
-    title = "Опасные и безобидные",
-    doneKey = "dangerous_or_not_done",
-    perfectKey = "perfect_dangerous_or_not",
-    questions = listOf(
-        ImageQuizQuestion("Какая из этих змей ядовитая?", listOf(
-            ImageQuizAnswer(R.drawable.ph_0008_3, true), // было «-верно-верно», это просто true
-            ImageQuizAnswer(R.drawable.ph_0012_1, false),
-            ImageQuizAnswer(R.drawable.ph_0013_1, false)
-        )),
-        ImageQuizQuestion("Водяного ужа часто убивают как ядовитую змею", listOf(
-            ImageQuizAnswer(R.drawable.ph_0012_2, true),
-            ImageQuizAnswer(R.drawable.ph_0020_7, false),
-            ImageQuizAnswer(R.drawable.ph_0013_2, false)
-        )),
-        ImageQuizQuestion("Эта окраска сразу подскажет, что змея не опасна", listOf(
-            ImageQuizAnswer(R.drawable.ph_0013_3, true),
-            ImageQuizAnswer(R.drawable.ph_0009_3, false),
-            ImageQuizAnswer(R.drawable.ph_0018_3, false)
-        )),
-        ImageQuizQuestion("Рядом с какой змеей находится очень опасно?", listOf(
-            ImageQuizAnswer(R.drawable.ph_0009_1, true),
-            ImageQuizAnswer(R.drawable.ph_0018_6, false),
-            ImageQuizAnswer(R.drawable.ph_0010_3, false),
-            ImageQuizAnswer(R.drawable.ph_0020_2, false)
-        )),
-        ImageQuizQuestion("Из амфибий Саратовской области эта наиболее опасна", listOf(
-            ImageQuizAnswer(R.drawable.ph_0002_2, true),
-            ImageQuizAnswer(R.drawable.ph_0021_2, false),
-            ImageQuizAnswer(R.drawable.ph_0004_2, false)
-        )),
-        ImageQuizQuestion("Кожа жаб выделяет ядовитую жидкость", listOf(
-            ImageQuizAnswer(R.drawable.ph_0001_1, true),
-            ImageQuizAnswer(R.drawable.ph_0006_2, false),
-            ImageQuizAnswer(R.drawable.ph_0021_1, false)
-        )),
-        ImageQuizQuestion("С помощью этого самцы громко «поют»", listOf(
-            ImageQuizAnswer(R.drawable.ph_0018_1, true),
-            ImageQuizAnswer(R.drawable.ph_0021_4, false),
-            ImageQuizAnswer(R.drawable.ph_0018_5, false),
-            ImageQuizAnswer(R.drawable.ph_0003_4, false),
-            ImageQuizAnswer(R.drawable.ph_0021_5, false)
-        )),
-        ImageQuizQuestion("Этих безногих ящериц убивают, принимая за змею", listOf(
-            ImageQuizAnswer(R.drawable.ph_0007_1, true),
-            ImageQuizAnswer(R.drawable.ph_0012_1, false),
-            ImageQuizAnswer(R.drawable.ph_0009_2, false),
-            ImageQuizAnswer(R.drawable.ph_0020_3, false)
-        )),
-        ImageQuizQuestion("Ящерицы могут укусить, а ЭТО – вообще не ящерица", listOf(
-            ImageQuizAnswer(R.drawable.ph_0005_1, true),
-            ImageQuizAnswer(R.drawable.ph_0017_3, false),
-            ImageQuizAnswer(R.drawable.ph_0015_1, false),
-            ImageQuizAnswer(R.drawable.ph_0020_4, false)
-        )),
-        ImageQuizQuestion("Такая окраска предупреждает об опасности", listOf(
-            ImageQuizAnswer(R.drawable.ph_0009_3, true),
-            ImageQuizAnswer(R.drawable.ph_0011_1, false),
-            ImageQuizAnswer(R.drawable.ph_0007_2, false),
-            ImageQuizAnswer(R.drawable.ph_0021_5, false)
-        ))
-    )
-)
